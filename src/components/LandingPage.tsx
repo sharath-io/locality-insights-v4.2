@@ -73,7 +73,8 @@ export default function LandingPage() {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   const handleGenerate = () => {
-    setSelectedCategories(selected);
+    const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
+    setSelectedCategories(labels);
     setCoordinates(parseCoordinates(inputUrl));
     navigate({ to: '/analysis' });
   };
