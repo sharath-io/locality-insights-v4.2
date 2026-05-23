@@ -55,21 +55,21 @@ export function useBrochureExport(
   const busyRef = useRef(false);
 
   const withFont = useCallback(
-    async <T,>(fn: (node: SVGSVGElement, dim: typeof DIMENSIONS[ExportFormat]) => Promise<T>): Promise<T | null> => {
-      if (!svgRef.current || busyRef.current) return null;
+    async <T,>(fn: (node: HTMLElement | SVGSVGElement, dim: typeof DIMENSIONS[ExportFormat]) => Promise<T>): Promise<T | null> => {
+      if (!nodeRef.current || busyRef.current) return null;
       busyRef.current = true;
-      const svg = svgRef.current;
+      const node = nodeRef.current;
       const css = await getFontFaceCss();
-      const styleNode = css ? injectFontStyle(svg, css) : null;
+      const styleNode = css ? injectFontStyle(node, css) : null;
       const dim = DIMENSIONS[exportFormat];
       try {
-        return await fn(svg, dim);
+        return await fn(node, dim);
       } finally {
         if (styleNode && styleNode.parentNode) styleNode.parentNode.removeChild(styleNode);
         busyRef.current = false;
       }
     },
-    [svgRef, exportFormat],
+    [nodeRef, exportFormat],
   );
 
   const exportPng = useCallback(async () => {
