@@ -382,11 +382,7 @@ function GoogleMapInner({
     anchor: new google.maps.Point(0, 0),
   };
 
-  const tierStyle: Record<RoadSegment['tier'], { color: string; weight: number; opacity: number; zIndex: number }> = {
-    highway: { color: '#ff6a1f', weight: 6, opacity: 0.95, zIndex: 30 },
-    main: { color: '#1e7fd6', weight: 4, opacity: 0.85, zIndex: 20 },
-    local: { color: '#6a6557', weight: 1.5, opacity: 0.35, zIndex: 10 },
-  };
+  const tierStyle = ROAD_TIER_STYLE;
 
   return (
     <GoogleMap
