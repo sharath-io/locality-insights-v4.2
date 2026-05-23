@@ -209,14 +209,36 @@ function MapView() {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const keys = useMapKeys();
+  const loadRoads = useServerFn(fetchRoads);
+  const [roads, setRoads] = useState<RoadSegment[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const d = 0.025;
+    loadRoads({
+      data: {
+        bbox: {
+          minLat: coordinates.lat - d,
+          maxLat: coordinates.lat + d,
+          minLng: coordinates.lng - d,
+          maxLng: coordinates.lng + d,
+        },
+      },
+    })
+      .then((r) => !cancelled && setRoads(r))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [coordinates, loadRoads]);
 
   if (mapProvider === 'mapbox') {
     return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} />;
   }
-  return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
+  return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} roads={roads} />;
 }
 
-function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?: string }) {
+function GoogleMapView({ lat, lng, apiKey, roads }: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[] }) {
   if (!apiKey) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
