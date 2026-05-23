@@ -21,10 +21,10 @@ const TEMPLATES: Array<{ id: Template; name: string; colors: [string, string, st
   { id: 'investment', name: 'Investment Brief', colors: ['#1a3c2a', '#d4b077', '#f5f0e8'] },
 ];
 
-const FORMATS: Array<{ id: ExportFormat; label: string; dims: string; Icon: typeof Instagram; aspect: string }> = [
-  { id: 'instagram', label: 'Instagram 1:1', dims: '1080 × 1080', Icon: Instagram, aspect: 'aspect-square' },
-  { id: 'whatsapp', label: 'WhatsApp 9:16', dims: '1080 × 1920', Icon: MessageCircle, aspect: 'aspect-[9/16]' },
-  { id: 'print', label: 'Print A4', dims: '2480 × 3508', Icon: Printer, aspect: 'aspect-[210/297]' },
+const FORMATS: Array<{ id: ExportFormat; label: string; dims: string; Icon: typeof Instagram }> = [
+  { id: 'instagram', label: 'Instagram 1:1', dims: '1080 × 1080', Icon: Instagram },
+  { id: 'whatsapp', label: 'WhatsApp 9:16', dims: '1080 × 1920', Icon: MessageCircle },
+  { id: 'print', label: 'Print A4', dims: '2480 × 3508', Icon: Printer },
 ];
 
 const ASPECT_BY_FORMAT: Record<ExportFormat, string> = {
