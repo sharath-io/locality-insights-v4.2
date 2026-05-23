@@ -1,15 +1,23 @@
 import { forwardRef, useMemo } from 'react';
-import type { LocationReport, POIItem } from '@/types';
+import type { LocationReport, POIItem, RoadSegment } from '@/types';
 import {
   computeBBoxFromReport,
   projectToSVG,
   computeLabelPositions,
+  pointsToSVGPath,
 } from '@/lib/brochure/engine';
 
 interface Props {
   report: LocationReport;
   projectName: string;
+  roads?: RoadSegment[];
 }
+
+const TIER_STYLE: Record<RoadSegment['tier'], { stroke: string; width: number }> = {
+  local: { stroke: '#c8c2b0', width: 1.5 },
+  main: { stroke: '#3d5a7a', width: 3.5 },
+  highway: { stroke: '#0f1e35', width: 8 },
+};
 
 const CANVAS_W = 900;
 const CANVAS_H = 620;
@@ -30,7 +38,7 @@ function colorForType(type: string): string {
 }
 
 const BrochureCanvas = forwardRef<SVGSVGElement, Props>(function BrochureCanvas(
-  { report, projectName },
+  { report, projectName, roads },
   ref,
 ) {
   const bbox = useMemo(() => computeBBoxFromReport(report), [report]);
@@ -92,53 +100,52 @@ const BrochureCanvas = forwardRef<SVGSVGElement, Props>(function BrochureCanvas(
       <rect x={0} y={0} width={CANVAS_W} height={CANVAS_H} fill="#f5f0e8" />
       {textureLines}
 
-      {/* LAYER 2 — MOCK ROADS */}
-      {/* Local roads */}
-      <path
-        d="M 60 200 Q 300 240 500 290 T 860 360"
-        stroke="#c8c2b0"
-        strokeWidth={1.5}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 120 520 Q 320 400 500 340 T 840 230"
-        stroke="#c8c2b0"
-        strokeWidth={1.5}
-        fill="none"
-        strokeLinecap="round"
-      />
-      {/* Main roads */}
-      <path
-        d="M 40 380 Q 240 330 460 320 T 870 280"
-        stroke="#3d5a7a"
-        strokeWidth={3.5}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 460 60 Q 430 230 450 310 T 470 580"
-        stroke="#3d5a7a"
-        strokeWidth={3.5}
-        fill="none"
-        strokeLinecap="round"
-      />
-      {/* Highway */}
-      <path
-        d="M 0 320 Q 220 280 450 310 T 900 290"
-        stroke="#0f1e35"
-        strokeWidth={8}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 0 320 Q 220 280 450 310 T 900 290"
-        stroke="white"
-        strokeWidth={1.5}
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray="10 8"
-      />
+      {/* LAYER 2 — ROADS (real if loaded, mock fallback otherwise) */}
+      {roads && roads.length > 0 ? (
+        <>
+          {/* Render in tier order: local, main, highway (highway on top) */}
+          {(['local', 'main', 'highway'] as const).flatMap((tier) =>
+            roads
+              .filter((r) => r.tier === tier)
+              .map((r, i) => {
+                const d = pointsToSVGPath(r.points, bbox, CANVAS_W, CANVAS_H);
+                const s = TIER_STYLE[tier];
+                return (
+                  <g key={`road-${tier}-${i}`}>
+                    <path
+                      d={d}
+                      stroke={s.stroke}
+                      strokeWidth={s.width}
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {tier === 'highway' && (
+                      <path
+                        d={d}
+                        stroke="white"
+                        strokeWidth={1.5}
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeDasharray="10 8"
+                      />
+                    )}
+                  </g>
+                );
+              }),
+          )}
+        </>
+      ) : (
+        <>
+          {/* Mock fallback */}
+          <path d="M 60 200 Q 300 240 500 290 T 860 360" stroke="#c8c2b0" strokeWidth={1.5} fill="none" strokeLinecap="round" />
+          <path d="M 120 520 Q 320 400 500 340 T 840 230" stroke="#c8c2b0" strokeWidth={1.5} fill="none" strokeLinecap="round" />
+          <path d="M 40 380 Q 240 330 460 320 T 870 280" stroke="#3d5a7a" strokeWidth={3.5} fill="none" strokeLinecap="round" />
+          <path d="M 460 60 Q 430 230 450 310 T 470 580" stroke="#3d5a7a" strokeWidth={3.5} fill="none" strokeLinecap="round" />
+          <path d="M 0 320 Q 220 280 450 310 T 900 290" stroke="#0f1e35" strokeWidth={8} fill="none" strokeLinecap="round" />
+          <path d="M 0 320 Q 220 280 450 310 T 900 290" stroke="white" strokeWidth={1.5} fill="none" strokeLinecap="round" strokeDasharray="10 8" />
+        </>
+      )}
 
       {/* LAYER 4 — POI PINS AND LABELS (under site marker) */}
       {labelPlacements.map((lp, i) => {
