@@ -198,7 +198,7 @@ const BrochureCanvas = forwardRef<SVGSVGElement, Props>(function BrochureCanvas(
               cx={proj.x}
               cy={proj.y}
               r={5}
-              fill={colorForType(lp.poi.type as string)}
+              fill={colorForType((lp.poi as POIItem & { type?: string }).type ?? '')}
               stroke="white"
               strokeWidth={1.5}
             />
