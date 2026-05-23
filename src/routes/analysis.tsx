@@ -212,18 +212,22 @@ function MapView() {
 }
 
 function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?: string }) {
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: apiKey ?? '',
-  });
-
   if (!apiKey) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
-        Google Maps key not configured.
+        Loading map…
       </div>
     );
   }
+  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} />;
+}
+
+function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: apiKey,
+  });
+
   if (!isLoaded) {
     return <div className="w-full h-full bg-[var(--cream)]" />;
   }
