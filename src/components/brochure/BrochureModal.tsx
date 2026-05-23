@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useServerFn } from '@tanstack/react-start';
-import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
-import { Instagram, MessageCircle, Printer, Download } from 'lucide-react';
+import { Instagram, MessageCircle, Printer, Download, Copy, Link2 } from 'lucide-react';
 import { useReportStore } from '@/stores/reportStore';
 import { fetchRoads } from '@/lib/fetch-roads.functions';
+import { useBrochureExport } from '@/hooks/useBrochureExport';
 import BrochureCanvas from './BrochureCanvas';
 import type { RoadSegment } from '@/types';
 
@@ -37,6 +37,8 @@ export default function BrochureModal() {
   const [projectName, setProjectName] = useState(report?.site.label ?? 'Site Location');
   const [format, setFormat] = useState<ExportFormat>('instagram');
   const canvasWrapRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { exportPng, copyToClipboard } = useBrochureExport(svgRef, format, report?.reportId ?? 'report');
 
   useEffect(() => {
     if (report) setProjectName(report.site.label);
@@ -66,18 +68,17 @@ export default function BrochureModal() {
     };
   }, [open, report, fetchRoadsFn]);
 
-  const handleExport = async () => {
-    if (!canvasWrapRef.current) return;
+  const handleShareWhatsApp = () => {
+    const msg = `Check out the vicinity report for ${projectName}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const handleCopyLink = async () => {
     try {
-      const dataUrl = await toPng(canvasWrapRef.current, { pixelRatio: 2, cacheBust: true });
-      const link = document.createElement('a');
-      link.download = `${projectName.replace(/\s+/g, '-').toLowerCase()}-${format}.png`;
-      link.href = dataUrl;
-      link.click();
-      toast.success('Brochure exported');
-    } catch (err) {
-      console.error(err);
-      toast.error('Export failed.');
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied');
+    } catch {
+      toast.error('Could not copy link');
     }
   };
 
@@ -105,7 +106,7 @@ export default function BrochureModal() {
                   className="relative w-full shadow-2xl"
                   style={{ boxShadow: '0 30px 60px -20px rgba(0,0,0,0.6)' }}
                 >
-                  <BrochureCanvas report={report} projectName={projectName} roads={roads ?? undefined} />
+                  <BrochureCanvas ref={svgRef} report={report} projectName={projectName} roads={roads ?? undefined} />
                   {loadingRoads && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded">
                       <div className="flex flex-col items-center gap-3 text-white">
@@ -202,13 +203,46 @@ export default function BrochureModal() {
 
                 <div className="flex-1" />
 
-                <button
-                  onClick={handleExport}
-                  className="w-full bg-[#b8954a] text-[#0f1e35] rounded-lg py-3 flex items-center justify-center gap-2 hover:brightness-105 transition"
-                  style={{ fontFamily: 'Poppins, sans-serif', fontSize: 14, fontWeight: 600 }}
-                >
-                  Export PNG <Download className="w-4 h-4" />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportPng}
+                    className="flex-1 bg-[#b8954a] text-[#0f1e35] rounded-lg py-3 flex items-center justify-center gap-2 hover:brightness-105 transition"
+                    style={{ fontFamily: 'Poppins, sans-serif', fontSize: 14, fontWeight: 600 }}
+                  >
+                    Export PNG <Download className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={copyToClipboard}
+                    title="Copy to clipboard"
+                    className="w-12 rounded-lg border border-[#0f1e35]/30 text-[#0f1e35] flex items-center justify-center hover:bg-[#0f1e35]/5 transition"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={handleShareWhatsApp}
+                    title="Share to WhatsApp"
+                    className="flex-1 border border-[#0f1e35]/30 text-[#0f1e35] rounded-md py-2 flex items-center justify-center gap-1.5 text-xs hover:bg-[#0f1e35]/5 transition"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                  </button>
+                  <button
+                    onClick={handleCopyLink}
+                    title="Copy link"
+                    className="flex-1 border border-[#0f1e35]/30 text-[#0f1e35] rounded-md py-2 flex items-center justify-center gap-1.5 text-xs hover:bg-[#0f1e35]/5 transition"
+                  >
+                    <Link2 className="w-3.5 h-3.5" /> Link
+                  </button>
+                  <button
+                    onClick={exportPng}
+                    title="Download"
+                    className="flex-1 border border-[#0f1e35]/30 text-[#0f1e35] rounded-md py-2 flex items-center justify-center gap-1.5 text-xs hover:bg-[#0f1e35]/5 transition"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Save
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
