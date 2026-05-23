@@ -12,6 +12,7 @@ import {
 import { useReportStore } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
+import BrochureModal from '@/components/brochure/BrochureModal';
 
 export const Route = createFileRoute('/analysis')({
   head: () => ({
@@ -196,6 +197,7 @@ function AnalysisPage() {
           <span className="relative">Create Brochure</span>
         </button>
       </div>
+      <BrochureModal />
     </main>
   );
 }
