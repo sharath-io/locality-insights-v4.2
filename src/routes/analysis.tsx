@@ -428,8 +428,11 @@ function GoogleMapInner({
       center={{ lat, lng }}
       zoom={15}
       mapTypeId="roadmap"
+      onLoad={(m) => { mapRef.current = m; }}
+      onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
+
       {roads.map((r, i) => (
         <Polyline
           key={i}
