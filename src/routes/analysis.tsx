@@ -239,13 +239,14 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
     strokeColor: '#fff',
     strokeWeight: 3,
     scale: 1,
+    anchor: new google.maps.Point(0, 0),
   };
 
   return (
     <GoogleMap
       mapContainerStyle={{ width: '100%', height: '100%' }}
       center={{ lat, lng }}
-      zoom={14}
+      zoom={15}
       mapTypeId="roadmap"
       options={{
         disableDefaultUI: true,
