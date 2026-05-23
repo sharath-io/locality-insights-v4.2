@@ -32,16 +32,23 @@ async function getFontFaceCss(): Promise<string> {
   }
 }
 
-function injectFontStyle(svg: SVGSVGElement, css: string): SVGStyleElement {
-  const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+function injectFontStyle(node: HTMLElement | SVGSVGElement, css: string): HTMLStyleElement | SVGStyleElement {
+  if (node instanceof SVGSVGElement) {
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    style.setAttribute('data-brochure-font', 'true');
+    style.textContent = css;
+    node.insertBefore(style, node.firstChild);
+    return style;
+  }
+  const style = document.createElement('style');
   style.setAttribute('data-brochure-font', 'true');
   style.textContent = css;
-  svg.insertBefore(style, svg.firstChild);
+  node.insertBefore(style, node.firstChild);
   return style;
 }
 
 export function useBrochureExport(
-  svgRef: React.RefObject<SVGSVGElement | null>,
+  nodeRef: React.RefObject<HTMLElement | SVGSVGElement | null>,
   exportFormat: ExportFormat,
   reportId: string,
 ) {
