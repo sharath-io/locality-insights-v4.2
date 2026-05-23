@@ -7,15 +7,12 @@ import { fetchRoads } from '@/lib/fetch-roads.functions';
 import type { RoadSegment } from '@/types';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import {
-  ArrowLeft, Sparkles, Hospital, GraduationCap, BookOpen, Train, Bus,
-  Building2, ShoppingBag, Landmark, UtensilsCrossed, Camera, Trees,
-  MapPin, Route as RouteIcon, Navigation,
-} from 'lucide-react';
+import { ArrowLeft, Sparkles, MapPin } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useReportStore } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
+import { CATEGORY_META, ROAD_FOCUS_STYLES, ROAD_TIER_STYLE } from '@/lib/map-styles';
 import BrochureModal from '@/components/brochure/BrochureModal';
 
 export const Route = createFileRoute('/analysis')({
