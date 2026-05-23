@@ -424,7 +424,7 @@ function GoogleMapInner({
         const color = meta.color;
         const mid = { lat: (lat + p.lat) / 2, lng: (lng + p.lng) / 2 };
         return (
-          <div key={p.id}>
+          <Fragment key={p.id}>
             <Polyline
               path={[{ lat, lng }, { lat: p.lat, lng: p.lng }]}
               options={{
