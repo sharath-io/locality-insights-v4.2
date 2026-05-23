@@ -25,22 +25,6 @@ export const Route = createFileRoute('/analysis')({
   component: AnalysisPage,
 });
 
-const CATEGORY_META: Record<string, { Icon: typeof MapPin; color: string }> = {
-  HOSPITALS: { Icon: Hospital, color: '#d64545' },
-  SCHOOLS: { Icon: GraduationCap, color: '#3b82a4' },
-  COLLEGES: { Icon: BookOpen, color: '#6b4ea3' },
-  'METRO/RAILWAY': { Icon: Train, color: '#0f1e35' },
-  'BUS STOPS': { Icon: Bus, color: '#2f7d4f' },
-  'IT PARKS': { Icon: Building2, color: '#4a5a7a' },
-  'SHOPPING AREAS': { Icon: ShoppingBag, color: '#c25e8a' },
-  TEMPLES: { Icon: Landmark, color: '#b8954a' },
-  RESTAURANTS: { Icon: UtensilsCrossed, color: '#c47a3d' },
-  'TOURIST ATTRACTIONS': { Icon: Camera, color: '#7a5a3a' },
-  'LAKES/PARKS': { Icon: Trees, color: '#4a8a4f' },
-  LANDMARKS: { Icon: MapPin, color: '#0f1e35' },
-  HIGHWAYS: { Icon: RouteIcon, color: '#555' },
-  'MAIN ROADS': { Icon: Navigation, color: '#666' },
-};
 
 type PoiRow = {
   id: string;
