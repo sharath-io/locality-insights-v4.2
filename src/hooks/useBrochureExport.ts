@@ -6,8 +6,8 @@ export type ExportFormat = 'instagram' | 'whatsapp' | 'print';
 
 const DIMENSIONS: Record<ExportFormat, { width: number; height: number; pixelRatio: number }> = {
   instagram: { width: 1080, height: 1080, pixelRatio: 2 },
-  whatsapp: { width: 1080, height: 720, pixelRatio: 2 },
-  print: { width: 3508, height: 2480, pixelRatio: 1 },
+  whatsapp: { width: 1080, height: 1920, pixelRatio: 2 },
+  print: { width: 2480, height: 3508, pixelRatio: 1 },
 };
 
 const FONT_URL =
