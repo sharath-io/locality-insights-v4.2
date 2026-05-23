@@ -49,9 +49,15 @@ const ALL_IDS = CATEGORIES.map((c) => c.id);
 
 function parseCoordinates(input: string): { lat: number; lng: number } | null {
   if (!input) return null;
-  // Try @lat,lng pattern from full google maps URLs
+  // Prefer !3d<lat>!4d<lng> — these are the actual place coords (vs @ which is viewport center)
+  const place = input.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+  if (place) return { lat: parseFloat(place[1]), lng: parseFloat(place[2]) };
+  // Then @lat,lng viewport pattern
   const at = input.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
   if (at) return { lat: parseFloat(at[1]), lng: parseFloat(at[2]) };
+  // q=lat,lng or query=lat,lng pattern
+  const q = input.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (q) return { lat: parseFloat(q[1]), lng: parseFloat(q[2]) };
   // Generic: pull all decimal numbers and pick the first valid lat/lng pair
   const nums = input.match(/-?\d+\.\d+/g);
   if (nums && nums.length >= 2) {
