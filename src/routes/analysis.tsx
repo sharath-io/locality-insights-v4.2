@@ -99,6 +99,14 @@ function AnalysisPage() {
     });
   };
 
+  const setSelectedPois = useReportStore((s) => s.setSelectedPois);
+  useEffect(() => {
+    const list = topPois
+      .filter((p) => checkedIds.has(p.id))
+      .map(({ id, name, type, lat, lng, distanceKm }) => ({ id, name, type, lat, lng, distanceKm }));
+    setSelectedPois(list);
+  }, [checkedIds, topPois, setSelectedPois]);
+
   if (!coordinates) return null;
 
   return (
