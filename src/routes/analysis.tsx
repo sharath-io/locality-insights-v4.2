@@ -338,17 +338,9 @@ function GoogleMapView({
 }
 
 const ROAD_FOCUS_STYLES: google.maps.MapTypeStyle[] = [
-  { elementType: 'geometry', stylers: [{ color: '#f5f1e8' }] },
   { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8a8579' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f1e8' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
-  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#ece7db' }] },
-  { featureType: 'landscape.natural', stylers: [{ color: '#e4ddc9' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dde4ea' }] },
-  { featureType: 'water', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
   { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
   { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#f2b441' }] },
   { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#8a5a17' }, { weight: 1.5 }] },
@@ -369,6 +361,7 @@ function GoogleMapInner({
     googleMapsApiKey: apiKey,
   });
   const [bounce, setBounce] = useState(0);
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   // tick to animate POI markers (CSS-like bounce via re-render of scale)
   useEffect(() => {
@@ -377,9 +370,41 @@ function GoogleMapInner({
     return () => window.clearInterval(id);
   }, [isLoaded]);
 
+  // Auto-fit zoom when checked POIs change, keeping the site centered.
+  const checkedPois = activePois.filter((p) => p.checked);
+  const checkedKey = checkedPois.map((p) => p.id).sort().join('|');
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || checkedPois.length === 0) return;
+    let maxDLat = 0;
+    let maxDLng = 0;
+    for (const p of checkedPois) {
+      maxDLat = Math.max(maxDLat, Math.abs(p.lat - lat));
+      maxDLng = Math.max(maxDLng, Math.abs(p.lng - lng));
+    }
+    // Pad ~20% so points aren't on the edge
+    const padLat = Math.max(maxDLat * 1.2, 0.002);
+    const padLng = Math.max(maxDLng * 1.2, 0.002);
+    const bounds = new google.maps.LatLngBounds(
+      { lat: lat - padLat, lng: lng - padLng },
+      { lat: lat + padLat, lng: lng + padLng },
+    );
+    // Only zoom out — don't override the user's closer zoom unnecessarily.
+    const currentBounds = map.getBounds();
+    if (currentBounds && currentBounds.contains({ lat: lat + padLat, lng: lng + padLng } as google.maps.LatLngLiteral)
+      && currentBounds.contains({ lat: lat - padLat, lng: lng - padLng } as google.maps.LatLngLiteral)) {
+      return;
+    }
+    map.fitBounds(bounds, 40);
+    // fitBounds may shift center slightly; re-center on site.
+    window.setTimeout(() => map.panTo({ lat, lng }), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkedKey, lat, lng]);
+
   if (!isLoaded) {
     return <div className="w-full h-full bg-[var(--cream)]" />;
   }
+
 
   const markerIcon = {
     path: 'M 0,0 m -10,0 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0',
@@ -403,8 +428,11 @@ function GoogleMapInner({
       center={{ lat, lng }}
       zoom={15}
       mapTypeId="roadmap"
+      onLoad={(m) => { mapRef.current = m; }}
+      onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
+
       {roads.map((r, i) => (
         <Polyline
           key={i}
