@@ -30,7 +30,15 @@ export function usePlacesSearch() {
             radiusMeters: 5000,
           },
         });
-        if (!cancelled) setLocationReport(report);
+        if (!cancelled) {
+          setLocationReport(report);
+          const total = report.pois.reduce((n, g) => n + g.items.length, 0);
+          if (total === 0) {
+            toast.error(
+              'No nearby places returned. The Google Places API daily quota may be exhausted — try again tomorrow or increase the quota.',
+            );
+          }
+        }
       } catch (err) {
         console.error(err);
         if (!cancelled) toast.error('Failed to load vicinity data. Please try again.');
