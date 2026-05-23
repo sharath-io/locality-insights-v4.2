@@ -25,3 +25,9 @@ export interface LocationReport {
   bbox: BBox;
   reportId: string;
 }
+
+export interface RoadSegment {
+  tier: 'highway' | 'main' | 'local';
+  name: string;
+  points: Array<{ lat: number; lng: number }>;
+}
