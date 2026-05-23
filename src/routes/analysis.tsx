@@ -1,7 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, Polyline, useJsApiLoader } from '@react-google-maps/api';
+import { useServerFn } from '@tanstack/react-start';
+import { fetchRoads } from '@/lib/fetch-roads.functions';
+import type { RoadSegment } from '@/types';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
@@ -206,14 +209,36 @@ function MapView() {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const keys = useMapKeys();
+  const loadRoads = useServerFn(fetchRoads);
+  const [roads, setRoads] = useState<RoadSegment[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const d = 0.025;
+    loadRoads({
+      data: {
+        bbox: {
+          minLat: coordinates.lat - d,
+          maxLat: coordinates.lat + d,
+          minLng: coordinates.lng - d,
+          maxLng: coordinates.lng + d,
+        },
+      },
+    })
+      .then((r) => !cancelled && setRoads(r))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [coordinates, loadRoads]);
 
   if (mapProvider === 'mapbox') {
     return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} />;
   }
-  return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
+  return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} roads={roads} />;
 }
 
-function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?: string }) {
+function GoogleMapView({ lat, lng, apiKey, roads }: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[] }) {
   if (!apiKey) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
@@ -221,10 +246,36 @@ function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?
       </div>
     );
   }
-  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} />;
+  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} roads={roads} />;
 }
 
-function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
+const ROAD_FOCUS_STYLES: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#f5f1e8' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8a8579' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f1e8' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#ece7db' }] },
+  { featureType: 'landscape.natural', stylers: [{ color: '#e4ddc9' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dde4ea' }] },
+  { featureType: 'water', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+
+  // Roads — bold and dominant
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#f2b441' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#8a5a17' }, { weight: 1.5 }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#3a2a10' }] },
+  { featureType: 'road.arterial', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.arterial', elementType: 'geometry.stroke', stylers: [{ color: '#0f1e35' }, { weight: 1.2 }] },
+  { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#0f1e35' }] },
+  { featureType: 'road.local', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.local', elementType: 'geometry.stroke', stylers: [{ color: '#b8b2a3' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#6a6557' }] },
+];
+
+function GoogleMapInner({ lat, lng, apiKey, roads }: { lat: number; lng: number; apiKey: string; roads: RoadSegment[] }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
@@ -244,6 +295,12 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
     anchor: new google.maps.Point(0, 0),
   };
 
+  const tierStyle: Record<RoadSegment['tier'], { color: string; weight: number; opacity: number; zIndex: number }> = {
+    highway: { color: '#ff6a1f', weight: 6, opacity: 0.95, zIndex: 30 },
+    main: { color: '#1e7fd6', weight: 4, opacity: 0.85, zIndex: 20 },
+    local: { color: '#6a6557', weight: 1.5, opacity: 0.35, zIndex: 10 },
+  };
+
   return (
     <GoogleMap
       mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -253,10 +310,23 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
       options={{
         disableDefaultUI: true,
         zoomControl: true,
-        styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
+        styles: ROAD_FOCUS_STYLES,
       }}
     >
-      <Marker position={{ lat, lng }} icon={markerIcon as google.maps.Symbol} />
+      {roads.map((r, i) => (
+        <Polyline
+          key={i}
+          path={r.points.map((p) => ({ lat: p.lat, lng: p.lng }))}
+          options={{
+            strokeColor: tierStyle[r.tier].color,
+            strokeWeight: tierStyle[r.tier].weight,
+            strokeOpacity: tierStyle[r.tier].opacity,
+            zIndex: tierStyle[r.tier].zIndex,
+            clickable: false,
+          }}
+        />
+      ))}
+      <Marker position={{ lat, lng }} icon={markerIcon as google.maps.Symbol} zIndex={100} />
     </GoogleMap>
   );
 }
