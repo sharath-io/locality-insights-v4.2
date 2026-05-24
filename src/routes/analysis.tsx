@@ -489,61 +489,84 @@ function GoogleMapInner({
         />
       ))}
 
+      {/* Routes (rendered below markers/labels via zIndex hierarchy) */}
       {activePois.map((p, idx) => {
         const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
         const color = meta.color;
         const stagger = (idx % 2 === 0 ? 1 : -1) * (0.4 + (idx % 3) * 0.3);
         const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
-        
         return (
-          <Fragment key={p.id}>
-            {/* glow / halo bottom layer */}
+          <Fragment key={`route-${p.id}`}>
+            <Polyline path={path} options={{ strokeColor: color, strokeOpacity: 0.18, strokeWeight: 14, zIndex: 100, clickable: false }} />
+            <Polyline path={path} options={{ strokeColor: '#ffffff', strokeOpacity: 0.65, strokeWeight: 7, zIndex: 101, clickable: false }} />
             <Polyline
               path={path}
               options={{
-                strokeColor: color,
-                strokeOpacity: 0.18,
-                strokeWeight: 14,
-                zIndex: 200,
-                clickable: false,
-              }}
-            />
-            {/* soft white inner glow for contrast against roads */}
-            <Polyline
-              path={path}
-              options={{
-                strokeColor: '#ffffff',
-                strokeOpacity: 0.65,
-                strokeWeight: 7,
-                zIndex: 201,
-                clickable: false,
-              }}
-            />
-            {/* colored dashed top line */}
-            <Polyline
-              path={path}
-              options={{
-                strokeColor: color,
                 strokeOpacity: 0,
                 strokeWeight: 4,
-                zIndex: 202,
+                zIndex: 102,
                 clickable: false,
-                icons: [
-                  {
-                    icon: {
-                      path: 'M 0,-1 0,1',
-                      strokeOpacity: 1,
-                      strokeColor: color,
-                      strokeWeight: 4,
-                      scale: 4,
-                    },
-                    offset: '0',
-                    repeat: '14px',
-                  },
-                ],
+                icons: [{
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, strokeWeight: 4, scale: 4 },
+                  offset: '0',
+                  repeat: '14px',
+                }],
               }}
             />
+          </Fragment>
+        );
+      })}
+
+      {/* POI markers + smart radial labels */}
+      {(() => {
+        // 1. Compute angle (screen-space; y flipped) for each POI relative to SITE.
+        const withAngles = activePois.map((p) => {
+          const dx = p.lng - lng;
+          const dy = -(p.lat - lat); // negate so + = up on screen
+          return { p, angle: Math.atan2(dy, dx) };
+        });
+        // 2. Sort by angle and compute offset multipliers to relieve angular crowding.
+        const sorted = [...withAngles].sort((a, b) => a.angle - b.angle);
+        const offsetMap = new Map<string, number>();
+        const MIN_GAP = (28 * Math.PI) / 180; // ~28° before we push outward
+        sorted.forEach((cur, i) => {
+          if (sorted.length === 1) { offsetMap.set(cur.p.id, 1); return; }
+          const prev = sorted[(i - 1 + sorted.length) % sorted.length];
+          const next = sorted[(i + 1) % sorted.length];
+          const gap = (a: number, b: number) => {
+            const d = Math.abs(a - b) % (2 * Math.PI);
+            return Math.min(d, 2 * Math.PI - d);
+          };
+          const tightest = Math.min(gap(cur.angle, prev.angle), gap(cur.angle, next.angle));
+          let mult = 1;
+          if (tightest < MIN_GAP) mult = 1 + (i % 3) * 0.55; // alternate radial distance
+          offsetMap.set(cur.p.id, mult);
+        });
+
+        return withAngles.map(({ p, angle }) => {
+          const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
+          const color = meta.color;
+          const Icon = meta.Icon;
+          const mult = offsetMap.get(p.id) ?? 1;
+          // Marker radius 15 + 12px gap + extra per crowding tier.
+          const radial = 15 + 14 * mult;
+          const lx = Math.cos(angle) * radial;
+          const ly = -Math.sin(angle) * radial; // back to screen-y (down positive)
+          // Quadrant → translate so label sits OUTWARD from marker.
+          const absCos = Math.abs(Math.cos(angle));
+          const absSin = Math.abs(Math.sin(angle));
+          let tx = '-50%';
+          let ty = '-50%';
+          if (absCos >= absSin) {
+            tx = Math.cos(angle) > 0 ? '0%' : '-100%';
+            ty = '-50%';
+          } else {
+            tx = '-50%';
+            ty = Math.sin(angle) > 0 ? '-100%' : '0%'; // sin>0 means up on screen → label above
+          }
+          return (
             <OverlayView
+              key={p.id}
               position={{ lat: p.lat, lng: p.lng }}
               mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
             >
@@ -552,39 +575,67 @@ function GoogleMapInner({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.6 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
-                style={{ transform: 'translate(-50%, -50%)' }}
-                className="relative"
+                style={{ transform: 'translate(-50%, -50%)', position: 'relative' }}
               >
-                <div className="flex items-center gap-2">
-                  {/* circular icon marker */}
+                {/* connector line from marker to label when offset is large */}
+                {mult > 1 && (
                   <div
-                    className="relative flex items-center justify-center rounded-full border-[3px] border-white shrink-0"
                     style={{
-                      width: 30,
-                      height: 30,
-                      background: color,
-                      boxShadow: `0 4px 10px rgba(15,30,53,0.35), 0 0 0 1px ${color}40`,
-                      transform: !p.checked ? `scale(${1 + bounce * 0.12})` : undefined,
-                      transition: 'transform 220ms ease-out',
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      width: radial - 15,
+                      height: 1.5,
+                      background: `${color}80`,
+                      transformOrigin: '0 50%',
+                      transform: `rotate(${-angle}rad) translateX(15px)`,
+                      zIndex: 300,
+                      pointerEvents: 'none',
                     }}
-                  >
-                    <meta.Icon className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
-                  </div>
-                  {/* floating label chip with name + distance */}
+                  />
+                )}
+                {/* circular icon marker */}
+                <div
+                  className="relative flex items-center justify-center rounded-full border-[3px] border-white"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    background: color,
+                    boxShadow: `0 4px 10px rgba(15,30,53,0.35), 0 0 0 1px ${color}40`,
+                    transform: !p.checked ? `scale(${1 + bounce * 0.12})` : undefined,
+                    transition: 'transform 220ms ease-out',
+                    zIndex: 400,
+                  }}
+                >
+                  <Icon className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+                </div>
+                {/* label chip placed radially outward */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `calc(50% + ${lx}px)`,
+                    top: `calc(50% + ${ly}px)`,
+                    transform: `translate(${tx}, ${ty})`,
+                    zIndex: 500,
+                  }}
+                >
                   <div
-                    className="px-2 py-1 rounded-md bg-white text-[var(--navy)] text-[10px] font-semibold whitespace-nowrap shadow-md flex items-center gap-1.5"
+                    className="px-2 py-1.5 rounded-md bg-white shadow-md whitespace-nowrap"
                     style={{ borderLeft: `3px solid ${color}` }}
                   >
-                    <span className="truncate max-w-[140px]">{p.name}</span>
-                    <span className="text-[var(--muted)]">·</span>
-                    <span className="font-bold" style={{ color }}>{p.distanceKm.toFixed(1)} km</span>
+                    <div className="text-[10px] font-bold text-[var(--navy)] leading-tight truncate max-w-[150px]">
+                      {p.name}
+                    </div>
+                    <div className="text-[9px] font-bold leading-tight mt-0.5" style={{ color }}>
+                      {p.distanceKm.toFixed(1)} km
+                    </div>
                   </div>
                 </div>
               </motion.div>
             </OverlayView>
-          </Fragment>
-        );
-      })}
+          );
+        });
+      })()}
 
       {/* Premium SITE marker — layered HTML overlay */}
       <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
