@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleMap, Marker, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import { useServerFn } from '@tanstack/react-start';
 import { fetchRoads } from '@/lib/fetch-roads.functions';
 import type { RoadSegment } from '@/types';
