@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleMap, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Polyline, Circle, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import { useServerFn } from '@tanstack/react-start';
 import { fetchRoads } from '@/lib/fetch-roads.functions';
 import type { RoadSegment } from '@/types';
@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useReportStore } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
-import { CATEGORY_META, ROAD_FOCUS_STYLES, ROAD_TIER_STYLE } from '@/lib/map-styles';
+import { CATEGORY_META, ROAD_FOCUS_STYLES, ROAD_TIER_STYLE, DISTANCE_RINGS } from '@/lib/map-styles';
 import BrochureModal from '@/components/brochure/BrochureModal';
 
 export const Route = createFileRoute('/analysis')({
@@ -136,6 +136,28 @@ function AnalysisPage() {
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
           </div>
+
+          {/* Category legend */}
+          <AnimatePresence>
+            {activePois.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[60%]"
+              >
+                {Array.from(new Set(activePois.map((p) => p.type))).map((t) => {
+                  const meta = CATEGORY_META[t] ?? { color: '#666' };
+                  return (
+                    <div key={t} className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase font-semibold text-[var(--navy)]">
+                      <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                      {t}
+                    </div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
             {(['google', 'mapbox'] as const).map((p) => {
@@ -422,6 +444,36 @@ function GoogleMapInner({
       onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
+      {/* Distance rings (1 / 3 / 5 km) */}
+      {DISTANCE_RINGS.map((r) => (
+        <Circle
+          key={`ring-${r.km}`}
+          center={{ lat, lng }}
+          radius={r.km * 1000}
+          options={{
+            strokeColor: r.color,
+            strokeOpacity: r.opacity,
+            strokeWeight: r.weight,
+            fillOpacity: 0,
+            clickable: false,
+            zIndex: 5,
+          }}
+        />
+      ))}
+      {DISTANCE_RINGS.map((r) => (
+        <OverlayView
+          key={`ring-lbl-${r.km}`}
+          position={{ lat: lat + r.km / 111, lng }}
+          mapPaneName={OverlayView.OVERLAY_LAYER}
+        >
+          <div
+            style={{ transform: 'translate(-50%, -50%)' }}
+            className="px-1.5 py-0.5 rounded bg-white/90 text-[8px] tracking-[0.2em] uppercase font-bold text-[#b8954a] border border-[#b8954a]/40 shadow-sm"
+          >
+            {r.km} km
+          </div>
+        </OverlayView>
+      ))}
 
       {roads.map((r, i) => (
         <Polyline
@@ -495,7 +547,11 @@ function GoogleMapInner({
               position={{ lat: p.lat, lng: p.lng }}
               mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
             >
-              <div
+              <motion.div
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
                 style={{ transform: 'translate(-50%, -50%)' }}
                 className="relative"
               >
@@ -524,7 +580,7 @@ function GoogleMapInner({
                     <span className="font-bold" style={{ color }}>{p.distanceKm.toFixed(1)} km</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </OverlayView>
           </Fragment>
         );
