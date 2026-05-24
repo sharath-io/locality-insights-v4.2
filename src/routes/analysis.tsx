@@ -491,32 +491,38 @@ function GoogleMapInner({
                 ],
               }}
             />
-            <Marker
-              position={{ lat: p.lat, lng: p.lng }}
-              zIndex={300}
-              icon={{
-                path: 'M 0,0 m -8,0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0',
-                fillColor: color,
-                fillOpacity: 1,
-                strokeColor: '#fff',
-                strokeWeight: 2.5,
-                scale: p.checked ? 1 : 1 + bounce * 0.25,
-                anchor: new google.maps.Point(0, 0),
-              } as google.maps.Symbol}
-            />
             <OverlayView
               position={{ lat: p.lat, lng: p.lng }}
               mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
             >
               <div
-                style={{ transform: 'translate(14px, -50%)' }}
-                className="flex items-center"
+                style={{ transform: 'translate(-50%, -50%)' }}
+                className="relative"
               >
-                <div
-                  className="px-2.5 py-1 rounded-md bg-[var(--navy)] text-white text-[10px] font-bold uppercase tracking-[0.12em] whitespace-nowrap shadow-md"
-                  style={{ borderLeft: `3px solid ${color}` }}
-                >
-                  {p.name}
+                <div className="flex items-center gap-2">
+                  {/* circular icon marker */}
+                  <div
+                    className="relative flex items-center justify-center rounded-full border-[3px] border-white shrink-0"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      background: color,
+                      boxShadow: `0 4px 10px rgba(15,30,53,0.35), 0 0 0 1px ${color}40`,
+                      transform: !p.checked ? `scale(${1 + bounce * 0.12})` : undefined,
+                      transition: 'transform 220ms ease-out',
+                    }}
+                  >
+                    <meta.Icon className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+                  </div>
+                  {/* floating label chip with name + distance */}
+                  <div
+                    className="px-2 py-1 rounded-md bg-white text-[var(--navy)] text-[10px] font-semibold whitespace-nowrap shadow-md flex items-center gap-1.5"
+                    style={{ borderLeft: `3px solid ${color}` }}
+                  >
+                    <span className="truncate max-w-[140px]">{p.name}</span>
+                    <span className="text-[var(--muted)]">·</span>
+                    <span className="font-bold" style={{ color }}>{p.distanceKm.toFixed(1)} km</span>
+                  </div>
                 </div>
               </div>
             </OverlayView>
