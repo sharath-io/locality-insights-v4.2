@@ -554,14 +554,6 @@ function GoogleMapInner({
             {/* strong center core dot */}
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
           </span>
-          {/* floating label chip */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-3 px-2.5 py-1 rounded-md bg-[var(--navy)] text-white text-[9px] tracking-[0.2em] font-bold whitespace-nowrap"
-            style={{ boxShadow: '0 4px 12px rgba(15,30,53,0.35)' }}
-          >
-            <span className="absolute left-1/2 -translate-x-1/2 -top-1 w-2 h-2 rotate-45 bg-[var(--navy)]" />
-            PROJECT SITE
-          </div>
         </div>
       </OverlayView>
     </GoogleMap>
