@@ -442,7 +442,7 @@ function GoogleMapInner({
         const color = meta.color;
         const stagger = (idx % 2 === 0 ? 1 : -1) * (0.4 + (idx % 3) * 0.3);
         const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
-        const mid = path[Math.floor(path.length / 2)];
+        
         return (
           <Fragment key={p.id}>
             {/* glow / halo bottom layer */}
