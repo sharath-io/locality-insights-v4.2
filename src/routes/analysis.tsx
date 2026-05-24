@@ -525,7 +525,11 @@ function GoogleMapInner({
               position={{ lat: p.lat, lng: p.lng }}
               mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
             >
-              <div
+              <motion.div
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
                 style={{ transform: 'translate(-50%, -50%)' }}
                 className="relative"
               >
