@@ -380,14 +380,34 @@ function GoogleMapInner({
   }
 
 
-  const markerIcon = {
-    path: 'M 0,0 m -10,0 a 10,10 0 1,0 20,0 a 10,10 0 1,0 -20,0',
-    fillColor: '#d64545',
-    fillOpacity: 1,
-    strokeColor: '#fff',
-    strokeWeight: 3,
-    scale: 1,
-    anchor: new google.maps.Point(0, 0),
+  // Build a curved bezier path between two points with a perpendicular control offset.
+  // `stagger` shifts the curve so overlapping routes don't stack on the same path.
+  const buildCurvedPath = (
+    a: { lat: number; lng: number },
+    b: { lat: number; lng: number },
+    stagger: number,
+  ): google.maps.LatLngLiteral[] => {
+    const steps = 40;
+    const mx = (a.lat + b.lat) / 2;
+    const my = (a.lng + b.lng) / 2;
+    const dx = b.lat - a.lat;
+    const dy = b.lng - a.lng;
+    const len = Math.hypot(dx, dy) || 1;
+    const px = -dy / len;
+    const py = dx / len;
+    const curve = len * (0.18 + stagger * 0.08);
+    const cx = mx + px * curve;
+    const cy = my + py * curve;
+    const pts: google.maps.LatLngLiteral[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const omt = 1 - t;
+      pts.push({
+        lat: omt * omt * a.lat + 2 * omt * t * cx + t * t * b.lat,
+        lng: omt * omt * a.lng + 2 * omt * t * cy + t * t * b.lng,
+      });
+    }
+    return pts;
   };
 
   const tierStyle = ROAD_TIER_STYLE;
@@ -417,32 +437,63 @@ function GoogleMapInner({
         />
       ))}
 
-      {activePois.map((p) => {
+      {activePois.map((p, idx) => {
         const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
         const color = meta.color;
-        const mid = { lat: (lat + p.lat) / 2, lng: (lng + p.lng) / 2 };
+        const stagger = (idx % 2 === 0 ? 1 : -1) * (0.4 + (idx % 3) * 0.3);
+        const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
+        const mid = path[Math.floor(path.length / 2)];
         return (
           <Fragment key={p.id}>
+            {/* glow / halo bottom layer */}
             <Polyline
-              path={[{ lat, lng }, { lat: p.lat, lng: p.lng }]}
+              path={path}
+              options={{
+                strokeColor: color,
+                strokeOpacity: 0.18,
+                strokeWeight: 14,
+                zIndex: 200,
+                clickable: false,
+              }}
+            />
+            {/* soft white inner glow for contrast against roads */}
+            <Polyline
+              path={path}
+              options={{
+                strokeColor: '#ffffff',
+                strokeOpacity: 0.65,
+                strokeWeight: 7,
+                zIndex: 201,
+                clickable: false,
+              }}
+            />
+            {/* colored dashed top line */}
+            <Polyline
+              path={path}
               options={{
                 strokeColor: color,
                 strokeOpacity: 0,
-                strokeWeight: 3,
-                zIndex: 80,
+                strokeWeight: 4,
+                zIndex: 202,
                 clickable: false,
                 icons: [
                   {
-                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+                    icon: {
+                      path: 'M 0,-1 0,1',
+                      strokeOpacity: 1,
+                      strokeColor: color,
+                      strokeWeight: 4,
+                      scale: 4,
+                    },
                     offset: '0',
-                    repeat: '12px',
+                    repeat: '14px',
                   },
                 ],
               }}
             />
             <Marker
               position={{ lat: p.lat, lng: p.lng }}
-              zIndex={90}
+              zIndex={300}
               icon={{
                 path: 'M 0,0 m -8,0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0',
                 fillColor: color,
@@ -468,7 +519,40 @@ function GoogleMapInner({
         );
       })}
 
-      <Marker position={{ lat, lng }} icon={markerIcon as google.maps.Symbol} zIndex={100} />
+      {/* Premium SITE marker — layered HTML overlay */}
+      <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+        <div
+          style={{ transform: 'translate(-50%, -50%)' }}
+          className="relative pointer-events-none"
+        >
+          {/* outer animated pulse ring */}
+          <span
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-[#d64545] opacity-25 animate-ping"
+            style={{ animationDuration: '2.4s' }}
+          />
+          {/* soft radial glow */}
+          <span
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(214,69,69,0.45) 0%, rgba(214,69,69,0) 70%)' }}
+          />
+          {/* thick white-bordered red circle */}
+          <span
+            className="relative block w-10 h-10 rounded-full bg-[#d64545] border-[5px] border-white"
+            style={{ boxShadow: '0 8px 20px rgba(15,30,53,0.5), 0 2px 4px rgba(0,0,0,0.3)' }}
+          >
+            {/* strong center core dot */}
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
+          </span>
+          {/* floating label chip */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-3 px-2.5 py-1 rounded-md bg-[var(--navy)] text-white text-[9px] tracking-[0.2em] font-bold whitespace-nowrap"
+            style={{ boxShadow: '0 4px 12px rgba(15,30,53,0.35)' }}
+          >
+            <span className="absolute left-1/2 -translate-x-1/2 -top-1 w-2 h-2 rotate-45 bg-[var(--navy)]" />
+            PROJECT SITE
+          </div>
+        </div>
+      </OverlayView>
     </GoogleMap>
   );
 }
