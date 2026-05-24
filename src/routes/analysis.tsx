@@ -442,7 +442,7 @@ function GoogleMapInner({
         const color = meta.color;
         const stagger = (idx % 2 === 0 ? 1 : -1) * (0.4 + (idx % 3) * 0.3);
         const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
-        const mid = path[Math.floor(path.length / 2)];
+        
         return (
           <Fragment key={p.id}>
             {/* glow / halo bottom layer */}
@@ -505,14 +505,19 @@ function GoogleMapInner({
               } as google.maps.Symbol}
             />
             <OverlayView
-              position={mid}
+              position={{ lat: p.lat, lng: p.lng }}
               mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
             >
               <div
-                style={{ transform: 'translate(-50%, -50%)' }}
-                className="px-2 py-0.5 rounded-full bg-white text-[10px] font-semibold shadow border whitespace-nowrap"
+                style={{ transform: 'translate(14px, -50%)' }}
+                className="flex items-center"
               >
-                <span style={{ color }}>{p.distanceKm.toFixed(1)} km</span>
+                <div
+                  className="px-2.5 py-1 rounded-md bg-[var(--navy)] text-white text-[10px] font-bold uppercase tracking-[0.12em] whitespace-nowrap shadow-md"
+                  style={{ borderLeft: `3px solid ${color}` }}
+                >
+                  {p.name}
+                </div>
               </div>
             </OverlayView>
           </Fragment>
