@@ -137,6 +137,28 @@ function AnalysisPage() {
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
           </div>
 
+          {/* Category legend */}
+          <AnimatePresence>
+            {activePois.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[60%]"
+              >
+                {Array.from(new Set(activePois.map((p) => p.type))).map((t) => {
+                  const meta = CATEGORY_META[t] ?? { color: '#666' };
+                  return (
+                    <div key={t} className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase font-semibold text-[var(--navy)]">
+                      <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                      {t}
+                    </div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
             {(['google', 'mapbox'] as const).map((p) => {
               const active = mapProvider === p;
