@@ -558,7 +558,7 @@ function GoogleMapInner({
                     <span className="font-bold" style={{ color }}>{p.distanceKm.toFixed(1)} km</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </OverlayView>
           </Fragment>
         );
