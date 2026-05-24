@@ -640,8 +640,8 @@ function GoogleMapInner({
       {/* Premium SITE marker — layered HTML overlay */}
       <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
         <div
-          style={{ transform: 'translate(-50%, -50%)' }}
-          className="relative pointer-events-none"
+          style={{ transform: 'translate(-50%, -50%)', zIndex: 700, position: 'relative' }}
+          className="pointer-events-none"
         >
           {/* outer animated pulse ring */}
           <span
