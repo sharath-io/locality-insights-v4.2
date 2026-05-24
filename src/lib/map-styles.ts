@@ -52,6 +52,35 @@ export const ROAD_TIER_STYLE: Record<'highway' | 'main' | 'local', { color: stri
   local: { color: '#6a6557', weight: 1.5, opacity: 0.35, zIndex: 10 },
 };
 
+// Premium, editorial-grade base style for the brochure export canvas.
+export const BROCHURE_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ saturation: -75 }, { lightness: 18 }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f0e8' }, { weight: 3 }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#6a6557' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative', stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f5f0e8' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e3e8d8' }, { visibility: 'on' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#cdd9e3' }] },
+  { featureType: 'water', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#e8c07a' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#8a5a17' }, { weight: 1.6 }] },
+  { featureType: 'road.arterial', elementType: 'geometry.fill', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road.arterial', elementType: 'geometry.stroke', stylers: [{ color: '#b8b0a0' }, { weight: 1 }] },
+  { featureType: 'road.local', elementType: 'geometry.fill', stylers: [{ color: '#fbfaf6' }] },
+  { featureType: 'road.local', elementType: 'geometry.stroke', stylers: [{ visibility: 'off' }] },
+];
+
+// Concentric proximity rings around the SITE (rendered as google.maps.Circle).
+export const DISTANCE_RINGS: Array<{ km: number; color: string; opacity: number; weight: number }> = [
+  { km: 1, color: '#b8954a', opacity: 0.55, weight: 1.2 },
+  { km: 3, color: '#b8954a', opacity: 0.35, weight: 1 },
+  { km: 5, color: '#b8954a', opacity: 0.2, weight: 1 },
+];
+
 export type SelectedPoi = {
   id: string;
   name: string;
