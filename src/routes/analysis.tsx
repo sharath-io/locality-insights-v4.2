@@ -444,50 +444,9 @@ function GoogleMapInner({
       onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
-      {/* Distance rings (1 / 3 / 5 km) */}
-      {DISTANCE_RINGS.map((r) => (
-        <Circle
-          key={`ring-${r.km}`}
-          center={{ lat, lng }}
-          radius={r.km * 1000}
-          options={{
-            strokeColor: r.color,
-            strokeOpacity: r.opacity,
-            strokeWeight: r.weight,
-            fillOpacity: 0,
-            clickable: false,
-            zIndex: 5,
-          }}
-        />
-      ))}
-      {DISTANCE_RINGS.map((r) => (
-        <OverlayView
-          key={`ring-lbl-${r.km}`}
-          position={{ lat: lat + r.km / 111, lng }}
-          mapPaneName={OverlayView.OVERLAY_LAYER}
-        >
-          <div
-            style={{ transform: 'translate(-50%, -50%)' }}
-            className="px-1.5 py-0.5 rounded bg-white/90 text-[8px] tracking-[0.2em] uppercase font-bold text-[#b8954a] border border-[#b8954a]/40 shadow-sm"
-          >
-            {r.km} km
-          </div>
-        </OverlayView>
-      ))}
+      {/* Distance rings removed for a cleaner brochure-grade canvas. */}
+      {/* Road tier overlay suppressed — base map roads + curved POI routes carry the visual weight. */}
 
-      {roads.map((r, i) => (
-        <Polyline
-          key={i}
-          path={r.points.map((p) => ({ lat: p.lat, lng: p.lng }))}
-          options={{
-            strokeColor: tierStyle[r.tier].color,
-            strokeWeight: tierStyle[r.tier].weight,
-            strokeOpacity: tierStyle[r.tier].opacity,
-            zIndex: tierStyle[r.tier].zIndex,
-            clickable: false,
-          }}
-        />
-      ))}
 
       {/* Routes (rendered below markers/labels via zIndex hierarchy) */}
       {activePois.map((p, idx) => {
