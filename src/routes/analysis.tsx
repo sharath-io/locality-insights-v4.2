@@ -450,19 +450,22 @@ function GoogleMapInner({
         const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
         return (
           <Fragment key={`route-${p.id}`}>
-            <Polyline path={path} options={{ strokeColor: color, strokeOpacity: 0.18, strokeWeight: 14, zIndex: 100, clickable: false }} />
-            <Polyline path={path} options={{ strokeColor: '#ffffff', strokeOpacity: 0.65, strokeWeight: 7, zIndex: 101, clickable: false }} />
+            {/* soft outer glow */}
+            <Polyline path={path} options={{ strokeColor: color, strokeOpacity: 0.10, strokeWeight: 16, zIndex: 100, clickable: false }} />
+            {/* inner white cushion to lift the dashed line off the basemap */}
+            <Polyline path={path} options={{ strokeColor: '#ffffff', strokeOpacity: 0.75, strokeWeight: 5, zIndex: 101, clickable: false }} />
+            {/* crisp coloured dashed top line */}
             <Polyline
               path={path}
               options={{
                 strokeOpacity: 0,
-                strokeWeight: 4,
+                strokeWeight: 3,
                 zIndex: 102,
                 clickable: false,
                 icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, strokeWeight: 4, scale: 4 },
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, strokeWeight: 3.2, scale: 3 },
                   offset: '0',
-                  repeat: '14px',
+                  repeat: '12px',
                 }],
               }}
             />
