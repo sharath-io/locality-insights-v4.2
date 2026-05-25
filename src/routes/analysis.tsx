@@ -608,30 +608,27 @@ function GoogleMapInner({
         });
       })()}
 
-      {/* Premium SITE marker — layered HTML overlay */}
+      {/* Clean minimal red location pin — no glow, pulse, or heavy shadow */}
       <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
         <div
-          style={{ transform: 'translate(-50%, -50%)', zIndex: 700, position: 'relative' }}
+          style={{
+            // Anchor the pin tip (not its center) onto the coordinate.
+            transform: 'translate(-50%, -100%)',
+            zIndex: 700,
+            position: 'relative',
+          }}
           className="pointer-events-none"
         >
-          {/* outer animated pulse ring */}
-          <span
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-[#d64545] opacity-25 animate-ping"
-            style={{ animationDuration: '2.4s' }}
-          />
-          {/* soft radial glow */}
-          <span
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full"
-            style={{ background: 'radial-gradient(circle, rgba(214,69,69,0.45) 0%, rgba(214,69,69,0) 70%)' }}
-          />
-          {/* thick white-bordered red circle */}
-          <span
-            className="relative block w-10 h-10 rounded-full bg-[#d64545] border-[5px] border-white"
-            style={{ boxShadow: '0 8px 20px rgba(15,30,53,0.5), 0 2px 4px rgba(0,0,0,0.3)' }}
-          >
-            {/* strong center core dot */}
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white" />
-          </span>
+          <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
+              fill="#E53935"
+              stroke="#ffffff"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <circle cx="17" cy="17" r="5.5" fill="#ffffff" />
+          </svg>
         </div>
       </OverlayView>
     </GoogleMap>
