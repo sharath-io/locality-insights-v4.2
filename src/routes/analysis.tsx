@@ -48,6 +48,7 @@ function AnalysisPage() {
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [radiusKm, setRadiusKm] = useState<number | 'all'>('all');
 
   usePlacesSearch();
 
