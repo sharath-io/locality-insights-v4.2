@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useServerFn } from '@tanstack/react-start';
-import { GoogleMap, Polyline, Circle, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import { toast } from 'sonner';
 import { Instagram, MessageCircle, Printer, Download, Link2, Save, MapPin, Compass } from 'lucide-react';
 import { useReportStore } from '@/stores/reportStore';
@@ -12,7 +12,6 @@ import { useBrochureExport } from '@/hooks/useBrochureExport';
 import {
   CATEGORY_META,
   BROCHURE_MAP_STYLES,
-  DISTANCE_RINGS,
   ROAD_TIER_STYLE,
 } from '@/lib/map-styles';
 import type { RoadSegment } from '@/types';
@@ -409,42 +408,7 @@ function BrochureMap({
         backgroundColor: '#f5f0e8',
       }}
     >
-      {/* Distance rings */}
-      {DISTANCE_RINGS.map((r) => (
-        <Circle
-          key={r.km}
-          center={{ lat, lng }}
-          radius={r.km * 1000}
-          options={{
-            strokeColor: r.color,
-            strokeOpacity: r.opacity,
-            strokeWeight: r.weight,
-            fillOpacity: 0,
-            clickable: false,
-            zIndex: 5,
-          }}
-        />
-      ))}
-
-      {/* Distance ring labels */}
-      {DISTANCE_RINGS.map((r) => {
-        // ~111km per degree latitude
-        const offsetLat = r.km / 111;
-        return (
-          <OverlayView
-            key={`lbl-${r.km}`}
-            position={{ lat: lat + offsetLat, lng }}
-            mapPaneName={OverlayView.OVERLAY_LAYER}
-          >
-            <div
-              style={{ transform: 'translate(-50%, -50%)' }}
-              className="px-1.5 py-0.5 rounded bg-[#f5f0e8] text-[8px] tracking-[0.2em] uppercase font-bold text-[#b8954a] border border-[#b8954a]/40"
-            >
-              {r.km} km
-            </div>
-          </OverlayView>
-        );
-      })}
+      {/* Distance rings removed — cleaner editorial canvas */}
 
       {/* Roads (subdued highways only for context) */}
       {roads.filter((r) => r.tier === 'highway').map((r, i) => (
@@ -566,26 +530,22 @@ function BrochureMap({
         );
       })}
 
-      {/* Premium SITE marker — much larger than POIs */}
+      {/* Clean SITE pin — no glow, pulse, or heavy shadow. Tip anchors on coordinate. */}
       <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
         <div
-          style={{ transform: 'translate(-50%, -50%)' }}
-          className="relative pointer-events-none"
+          style={{ transform: 'translate(-50%, -100%)', zIndex: 700, position: 'relative' }}
+          className="pointer-events-none"
         >
-          <span
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 rounded-full bg-[#E53935] opacity-20 animate-ping"
-            style={{ animationDuration: '2.6s' }}
-          />
-          <span
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full"
-            style={{ background: 'radial-gradient(circle, rgba(229,57,53,0.42) 0%, rgba(229,57,53,0) 70%)' }}
-          />
-          <span
-            className="relative block w-14 h-14 rounded-full bg-[#E53935] border-[6px] border-white"
-            style={{ boxShadow: '0 10px 26px rgba(15,30,53,0.55), 0 2px 6px rgba(0,0,0,0.35)' }}
-          >
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white" />
-          </span>
+          <svg width="44" height="56" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
+              fill="#E53935"
+              stroke="#ffffff"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <circle cx="17" cy="17" r="5.5" fill="#ffffff" />
+          </svg>
         </div>
       </OverlayView>
     </GoogleMap>
