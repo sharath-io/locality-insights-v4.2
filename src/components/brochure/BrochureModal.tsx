@@ -409,42 +409,7 @@ function BrochureMap({
         backgroundColor: '#f5f0e8',
       }}
     >
-      {/* Distance rings */}
-      {DISTANCE_RINGS.map((r) => (
-        <Circle
-          key={r.km}
-          center={{ lat, lng }}
-          radius={r.km * 1000}
-          options={{
-            strokeColor: r.color,
-            strokeOpacity: r.opacity,
-            strokeWeight: r.weight,
-            fillOpacity: 0,
-            clickable: false,
-            zIndex: 5,
-          }}
-        />
-      ))}
-
-      {/* Distance ring labels */}
-      {DISTANCE_RINGS.map((r) => {
-        // ~111km per degree latitude
-        const offsetLat = r.km / 111;
-        return (
-          <OverlayView
-            key={`lbl-${r.km}`}
-            position={{ lat: lat + offsetLat, lng }}
-            mapPaneName={OverlayView.OVERLAY_LAYER}
-          >
-            <div
-              style={{ transform: 'translate(-50%, -50%)' }}
-              className="px-1.5 py-0.5 rounded bg-[#f5f0e8] text-[8px] tracking-[0.2em] uppercase font-bold text-[#b8954a] border border-[#b8954a]/40"
-            >
-              {r.km} km
-            </div>
-          </OverlayView>
-        );
-      })}
+      {/* Distance rings removed — cleaner editorial canvas */}
 
       {/* Roads (subdued highways only for context) */}
       {roads.filter((r) => r.tier === 'highway').map((r, i) => (
