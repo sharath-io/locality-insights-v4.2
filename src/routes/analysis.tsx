@@ -342,7 +342,7 @@ function AnalysisPage() {
 
 type ActivePoi = PoiRow & { checked: boolean };
 
-function MapView({ activePois }: { activePois: ActivePoi[] }) {
+function MapView({ activePois, radiusKm }: { activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const keys = useMapKeys();
@@ -379,13 +379,14 @@ function MapView({ activePois }: { activePois: ActivePoi[] }) {
       apiKey={keys?.googleMapsKey}
       roads={roads}
       activePois={activePois}
+      radiusKm={radiusKm}
     />
   );
 }
 
 function GoogleMapView({
-  lat, lng, apiKey, roads, activePois,
-}: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[]; activePois: ActivePoi[] }) {
+  lat, lng, apiKey, roads, activePois, radiusKm,
+}: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[]; activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   if (!apiKey) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
@@ -393,13 +394,13 @@ function GoogleMapView({
       </div>
     );
   }
-  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} roads={roads} activePois={activePois} />;
+  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} roads={roads} activePois={activePois} radiusKm={radiusKm} />;
 }
 
 
 function GoogleMapInner({
-  lat, lng, apiKey, roads, activePois,
-}: { lat: number; lng: number; apiKey: string; roads: RoadSegment[]; activePois: ActivePoi[] }) {
+  lat, lng, apiKey, roads, activePois, radiusKm,
+}: { lat: number; lng: number; apiKey: string; roads: RoadSegment[]; activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
