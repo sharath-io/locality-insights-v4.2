@@ -595,6 +595,38 @@ function GoogleMapInner({
       onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
+      {/* Radius Intelligence — soft gold boundary + warm translucent fill */}
+      {radiusKm !== 'all' && (
+        <>
+          <Circle
+            center={{ lat, lng }}
+            radius={radiusKm * 1000}
+            options={{
+              strokeColor: '#b8954a',
+              strokeOpacity: 0.55,
+              strokeWeight: 1.2,
+              fillColor: '#e8c07a',
+              fillOpacity: 0.06,
+              clickable: false,
+              zIndex: 5,
+            }}
+          />
+          {/* faint inner accent ring */}
+          <Circle
+            center={{ lat, lng }}
+            radius={radiusKm * 1000 * 0.6}
+            options={{
+              strokeColor: '#b8954a',
+              strokeOpacity: 0.18,
+              strokeWeight: 1,
+              fillOpacity: 0,
+              clickable: false,
+              zIndex: 5,
+            }}
+          />
+        </>
+      )}
+
       {/* Shared trunked routes — clusters first (under branches), branches over */}
       {routeSegments.map((seg) => (
         <Fragment key={seg.key}>
