@@ -378,20 +378,14 @@ function GoogleMapInner({
       maxDLat = Math.max(maxDLat, Math.abs(p.lat - lat));
       maxDLng = Math.max(maxDLng, Math.abs(p.lng - lng));
     }
-    // Pad ~20% so points aren't on the edge
-    const padLat = Math.max(maxDLat * 1.2, 0.002);
-    const padLng = Math.max(maxDLng * 1.2, 0.002);
+    // Generous padding so POIs/labels sit comfortably inside the frame.
+    const padLat = Math.max(maxDLat * 1.6, 0.0035);
+    const padLng = Math.max(maxDLng * 1.6, 0.0035);
     const bounds = new google.maps.LatLngBounds(
       { lat: lat - padLat, lng: lng - padLng },
       { lat: lat + padLat, lng: lng + padLng },
     );
-    // Only zoom out — don't override the user's closer zoom unnecessarily.
-    const currentBounds = map.getBounds();
-    if (currentBounds && currentBounds.contains({ lat: lat + padLat, lng: lng + padLng } as google.maps.LatLngLiteral)
-      && currentBounds.contains({ lat: lat - padLat, lng: lng - padLng } as google.maps.LatLngLiteral)) {
-      return;
-    }
-    map.fitBounds(bounds, 40);
+    map.fitBounds(bounds, 80);
     // fitBounds may shift center slightly; re-center on site.
     window.setTimeout(() => map.panTo({ lat, lng }), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
