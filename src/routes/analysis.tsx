@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleMap, Polyline, Circle, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import { useServerFn } from '@tanstack/react-start';
 import { fetchRoads } from '@/lib/fetch-roads.functions';
 import type { RoadSegment } from '@/types';
@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useReportStore } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
-import { CATEGORY_META, ROAD_FOCUS_STYLES, ROAD_TIER_STYLE, DISTANCE_RINGS } from '@/lib/map-styles';
+import { CATEGORY_META, ROAD_FOCUS_STYLES } from '@/lib/map-styles';
 import BrochureModal from '@/components/brochure/BrochureModal';
 
 export const Route = createFileRoute('/analysis')({
@@ -378,20 +378,14 @@ function GoogleMapInner({
       maxDLat = Math.max(maxDLat, Math.abs(p.lat - lat));
       maxDLng = Math.max(maxDLng, Math.abs(p.lng - lng));
     }
-    // Pad ~20% so points aren't on the edge
-    const padLat = Math.max(maxDLat * 1.2, 0.002);
-    const padLng = Math.max(maxDLng * 1.2, 0.002);
+    // Generous padding so POIs/labels sit comfortably inside the frame.
+    const padLat = Math.max(maxDLat * 1.6, 0.0035);
+    const padLng = Math.max(maxDLng * 1.6, 0.0035);
     const bounds = new google.maps.LatLngBounds(
       { lat: lat - padLat, lng: lng - padLng },
       { lat: lat + padLat, lng: lng + padLng },
     );
-    // Only zoom out — don't override the user's closer zoom unnecessarily.
-    const currentBounds = map.getBounds();
-    if (currentBounds && currentBounds.contains({ lat: lat + padLat, lng: lng + padLng } as google.maps.LatLngLiteral)
-      && currentBounds.contains({ lat: lat - padLat, lng: lng - padLng } as google.maps.LatLngLiteral)) {
-      return;
-    }
-    map.fitBounds(bounds, 40);
+    map.fitBounds(bounds, 80);
     // fitBounds may shift center slightly; re-center on site.
     window.setTimeout(() => map.panTo({ lat, lng }), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -432,7 +426,7 @@ function GoogleMapInner({
     return pts;
   };
 
-  const tierStyle = ROAD_TIER_STYLE;
+
 
   return (
     <GoogleMap
@@ -444,50 +438,9 @@ function GoogleMapInner({
       onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
-      {/* Distance rings (1 / 3 / 5 km) */}
-      {DISTANCE_RINGS.map((r) => (
-        <Circle
-          key={`ring-${r.km}`}
-          center={{ lat, lng }}
-          radius={r.km * 1000}
-          options={{
-            strokeColor: r.color,
-            strokeOpacity: r.opacity,
-            strokeWeight: r.weight,
-            fillOpacity: 0,
-            clickable: false,
-            zIndex: 5,
-          }}
-        />
-      ))}
-      {DISTANCE_RINGS.map((r) => (
-        <OverlayView
-          key={`ring-lbl-${r.km}`}
-          position={{ lat: lat + r.km / 111, lng }}
-          mapPaneName={OverlayView.OVERLAY_LAYER}
-        >
-          <div
-            style={{ transform: 'translate(-50%, -50%)' }}
-            className="px-1.5 py-0.5 rounded bg-white/90 text-[8px] tracking-[0.2em] uppercase font-bold text-[#b8954a] border border-[#b8954a]/40 shadow-sm"
-          >
-            {r.km} km
-          </div>
-        </OverlayView>
-      ))}
+      {/* Distance rings removed for a cleaner brochure-grade canvas. */}
+      {/* Road tier overlay suppressed — base map roads + curved POI routes carry the visual weight. */}
 
-      {roads.map((r, i) => (
-        <Polyline
-          key={i}
-          path={r.points.map((p) => ({ lat: p.lat, lng: p.lng }))}
-          options={{
-            strokeColor: tierStyle[r.tier].color,
-            strokeWeight: tierStyle[r.tier].weight,
-            strokeOpacity: tierStyle[r.tier].opacity,
-            zIndex: tierStyle[r.tier].zIndex,
-            clickable: false,
-          }}
-        />
-      ))}
 
       {/* Routes (rendered below markers/labels via zIndex hierarchy) */}
       {activePois.map((p, idx) => {
@@ -497,19 +450,22 @@ function GoogleMapInner({
         const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
         return (
           <Fragment key={`route-${p.id}`}>
-            <Polyline path={path} options={{ strokeColor: color, strokeOpacity: 0.18, strokeWeight: 14, zIndex: 100, clickable: false }} />
-            <Polyline path={path} options={{ strokeColor: '#ffffff', strokeOpacity: 0.65, strokeWeight: 7, zIndex: 101, clickable: false }} />
+            {/* soft outer glow */}
+            <Polyline path={path} options={{ strokeColor: color, strokeOpacity: 0.10, strokeWeight: 16, zIndex: 100, clickable: false }} />
+            {/* inner white cushion to lift the dashed line off the basemap */}
+            <Polyline path={path} options={{ strokeColor: '#ffffff', strokeOpacity: 0.75, strokeWeight: 5, zIndex: 101, clickable: false }} />
+            {/* crisp coloured dashed top line */}
             <Polyline
               path={path}
               options={{
                 strokeOpacity: 0,
-                strokeWeight: 4,
+                strokeWeight: 3,
                 zIndex: 102,
                 clickable: false,
                 icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, strokeWeight: 4, scale: 4 },
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, strokeWeight: 3.2, scale: 3 },
                   offset: '0',
-                  repeat: '14px',
+                  repeat: '12px',
                 }],
               }}
             />

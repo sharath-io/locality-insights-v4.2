@@ -171,26 +171,30 @@ export default function LandingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03, duration: 0.3, ease: 'easeOut' }}
                 onClick={() => toggle(cat.id)}
+                whileHover={{ y: -1 }}
                 className={`flex items-center gap-3 px-4 py-3.5 rounded-lg border-2 text-left transition-all ${
                   isSelected
-                    ? 'border-[var(--navy)] bg-[var(--navy)]/5'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                    ? 'border-[var(--gold)] bg-[var(--navy)]/[0.04] shadow-[0_6px_18px_-8px_rgba(15,30,53,0.35)]'
+                    : 'border-[#e8e2d4] bg-white hover:border-[var(--navy)]/40 hover:shadow-sm'
                 }`}
               >
                 <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 ${
-                    isSelected ? 'bg-[var(--navy)] border-[var(--navy)]' : 'border-gray-300'
+                  className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
+                    isSelected
+                      ? 'bg-[var(--navy)] border-[var(--navy)]'
+                      : 'border-[#cfc7b3] bg-white'
                   }`}
                 >
                   {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
                 </span>
                 <Icon
                   size={18}
-                  className={isSelected ? 'text-[var(--navy)]' : 'text-[var(--muted)]'}
+                  className={isSelected ? 'text-[var(--navy)]' : 'text-[var(--navy)]/70'}
+                  strokeWidth={isSelected ? 2.25 : 1.75}
                 />
                 <span
                   className={`text-[11px] font-semibold tracking-wider ${
-                    isSelected ? 'text-[var(--navy)]' : 'text-[var(--muted)]'
+                    isSelected ? 'text-[var(--navy)]' : 'text-[var(--navy)]/80'
                   }`}
                 >
                   {cat.label}
