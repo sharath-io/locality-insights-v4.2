@@ -148,7 +148,7 @@ function AnalysisPage() {
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
           style={{ height: '45vh' }}
         >
-          <MapView activePois={activePois} />
+          <MapView activePois={activePois} radiusKm={radiusKm} />
 
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
@@ -161,7 +161,7 @@ function AnalysisPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[60%]"
+                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[55%]"
               >
                 {Array.from(new Set(activePois.map((p) => p.type))).map((t) => {
                   const meta = CATEGORY_META[t] ?? { color: '#666' };
@@ -204,6 +204,35 @@ function AnalysisPage() {
             </div>
           )}
         </div>
+
+        {/* Radius Intelligence Mode — filter pills */}
+        <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1 bg-white border border-[#e8e2d4] rounded-full p-1 shadow-sm">
+            {([3, 5, 10, 'all'] as const).map((opt) => {
+              const active = radiusKm === opt;
+              const label = opt === 'all' ? 'All' : `Within ${opt} KM`;
+              return (
+                <button
+                  key={String(opt)}
+                  onClick={() => setRadiusKm(opt)}
+                  className={`text-[11px] tracking-wider px-4 py-2 rounded-full transition font-medium ${
+                    active
+                      ? 'bg-[var(--navy)] text-white shadow'
+                      : 'text-[var(--navy)] hover:bg-[var(--cream)]'
+                  }`}
+                  style={active && opt !== 'all' ? { background: 'var(--gold)', color: 'var(--navy)' } : undefined}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {radiusKm !== 'all' && (
+            <div className="text-[11px] text-[var(--muted)] tracking-wide">
+              Showing places within {radiusKm} KM radius
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="px-6 md:px-10 pt-12">
@@ -212,7 +241,9 @@ function AnalysisPage() {
             <div className="text-[10px] tracking-[0.25em] text-[var(--gold)] uppercase font-medium">
               Proximity Matrix
             </div>
-            <h2 className="font-heading text-[22px] text-[var(--navy)] mt-1">Nearby Intelligence</h2>
+            <h2 className="font-heading text-[22px] text-[var(--navy)] mt-1">
+              Nearby Intelligence{radiusKm !== 'all' ? ` (Within ${radiusKm} KM)` : ''}
+            </h2>
           </div>
           <AnimatePresence>
             {checkedIds.size > 0 && (
