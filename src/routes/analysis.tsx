@@ -519,8 +519,8 @@ function GoogleMapInner({
           const color = meta.color;
           const Icon = meta.Icon;
           const mult = offsetMap.get(p.id) ?? 1;
-          // Marker radius 15 + 12px gap + extra per crowding tier.
-          const radial = 15 + 14 * mult;
+          // Push labels well outward from the marker for brochure-grade breathing room.
+          const radial = 38 + 22 * mult;
           const lx = Math.cos(angle) * radial;
           const ly = -Math.sin(angle) * radial; // back to screen-y (down positive)
           // Quadrant → translate so label sits OUTWARD from marker.
