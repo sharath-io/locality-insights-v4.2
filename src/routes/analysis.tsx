@@ -261,7 +261,7 @@ function AnalysisPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
-          {topPois.map((p, i) => {
+          {visiblePois.map((p, i) => {
             const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#666' };
             const Icon = meta.Icon;
             const isChecked = checkedIds.has(p.id);
