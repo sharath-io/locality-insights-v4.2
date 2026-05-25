@@ -417,8 +417,9 @@ function GoogleMapInner({
     a: { lat: number; lng: number },
     b: { lat: number; lng: number },
     stagger: number,
+    curveScale = 0.18,
   ): google.maps.LatLngLiteral[] => {
-    const steps = 40;
+    const steps = 32;
     const mx = (a.lat + b.lat) / 2;
     const my = (a.lng + b.lng) / 2;
     const dx = b.lat - a.lat;
@@ -426,7 +427,7 @@ function GoogleMapInner({
     const len = Math.hypot(dx, dy) || 1;
     const px = -dy / len;
     const py = dx / len;
-    const curve = len * (0.18 + stagger * 0.08);
+    const curve = len * (curveScale + stagger * 0.08);
     const cx = mx + px * curve;
     const cy = my + py * curve;
     const pts: google.maps.LatLngLiteral[] = [];
@@ -441,7 +442,99 @@ function GoogleMapInner({
     return pts;
   };
 
+  // === Shared route trunking ===
+  // POIs travelling in similar directions share a thicker trunk segment outward
+  // from SITE before branching to their individual destinations. Reduces visual
+  // clutter near the center marker and creates a cleaner brochure hierarchy.
+  type RouteSegment = {
+    key: string;
+    path: google.maps.LatLngLiteral[];
+    color: string;
+    weight: number;
+    isTrunk: boolean;
+  };
 
+  const buildRouteSegments = (): RouteSegment[] => {
+    if (activePois.length === 0) return [];
+    const withGeom = activePois.map((p) => {
+      const dLat = p.lat - lat;
+      const dLng = p.lng - lng;
+      return {
+        p,
+        angle: Math.atan2(dLat, dLng),
+        dist: Math.hypot(dLat, dLng),
+      };
+    });
+
+    // Sort by angle and group consecutive POIs within CLUSTER_GAP into clusters.
+    const sorted = [...withGeom].sort((a, b) => a.angle - b.angle);
+    const CLUSTER_GAP = (30 * Math.PI) / 180;
+    const clusters: typeof sorted[] = [];
+    for (const item of sorted) {
+      const last = clusters[clusters.length - 1];
+      if (last && Math.abs(item.angle - last[last.length - 1].angle) < CLUSTER_GAP) {
+        last.push(item);
+      } else {
+        clusters.push([item]);
+      }
+    }
+    // Merge wrap-around (last + first) if angularly adjacent.
+    if (clusters.length > 1) {
+      const first = clusters[0];
+      const last = clusters[clusters.length - 1];
+      const wrapGap = 2 * Math.PI - last[last.length - 1].angle + first[0].angle;
+      if (wrapGap < CLUSTER_GAP) {
+        clusters[0] = [...last, ...first];
+        clusters.pop();
+      }
+    }
+
+    const segments: RouteSegment[] = [];
+    clusters.forEach((cluster, ci) => {
+      if (cluster.length === 1) {
+        const { p } = cluster[0];
+        const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
+        const stagger = (ci % 2 === 0 ? 1 : -1) * (0.3 + (ci % 3) * 0.25);
+        segments.push({
+          key: `solo-${p.id}`,
+          path: buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger),
+          color: meta.color,
+          weight: 3.0,
+          isTrunk: false,
+        });
+        return;
+      }
+      // Cluster trunk: shared outward stem.
+      const meanAngle = cluster.reduce((s, c) => s + c.angle, 0) / cluster.length;
+      const minDist = Math.min(...cluster.map((c) => c.dist));
+      const trunkLen = minDist * 0.45;
+      const trunkEnd = {
+        lat: lat + Math.sin(meanAngle) * trunkLen,
+        lng: lng + Math.cos(meanAngle) * trunkLen,
+      };
+      segments.push({
+        key: `trunk-${ci}`,
+        path: buildCurvedPath({ lat, lng }, trunkEnd, 0, 0.08),
+        color: '#1a2a44',
+        weight: 4.2,
+        isTrunk: true,
+      });
+      cluster.forEach((c, bi) => {
+        const meta = CATEGORY_META[c.p.type] ?? { Icon: MapPin, color: '#0f1e35' };
+        const stagger = (bi - (cluster.length - 1) / 2) * 0.8;
+        segments.push({
+          key: `branch-${ci}-${c.p.id}`,
+          path: buildCurvedPath(trunkEnd, { lat: c.p.lat, lng: c.p.lng }, stagger, 0.22),
+          color: meta.color,
+          weight: 2.8,
+          isTrunk: false,
+        });
+      });
+    });
+    return segments;
+  };
+
+  const routeSegments = buildRouteSegments();
 
   return (
     <GoogleMap
@@ -453,40 +546,61 @@ function GoogleMapInner({
       onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
-      {/* Distance rings removed for a cleaner brochure-grade canvas. */}
-      {/* Road tier overlay suppressed — base map roads + curved POI routes carry the visual weight. */}
-
-
-      {/* Routes (rendered below markers/labels via zIndex hierarchy) */}
-      {activePois.map((p, idx) => {
-        const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
-        const color = meta.color;
-        const stagger = (idx % 2 === 0 ? 1 : -1) * (0.4 + (idx % 3) * 0.3);
-        const path = buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger);
-        return (
-          <Fragment key={`route-${p.id}`}>
-            {/* soft outer glow */}
-            <Polyline path={path} options={{ strokeColor: color, strokeOpacity: 0.10, strokeWeight: 16, zIndex: 100, clickable: false }} />
-            {/* inner white cushion to lift the dashed line off the basemap */}
-            <Polyline path={path} options={{ strokeColor: '#ffffff', strokeOpacity: 0.75, strokeWeight: 5, zIndex: 101, clickable: false }} />
-            {/* crisp coloured dashed top line */}
+      {/* Shared trunked routes — clusters first (under branches), branches over */}
+      {routeSegments.map((seg) => (
+        <Fragment key={seg.key}>
+          {/* soft outer glow */}
+          <Polyline
+            path={seg.path}
+            options={{
+              strokeColor: seg.color,
+              strokeOpacity: seg.isTrunk ? 0.14 : 0.10,
+              strokeWeight: seg.isTrunk ? 18 : 14,
+              zIndex: seg.isTrunk ? 90 : 100,
+              clickable: false,
+            }}
+          />
+          {/* white cushion to lift dashed line off basemap */}
+          <Polyline
+            path={seg.path}
+            options={{
+              strokeColor: '#ffffff',
+              strokeOpacity: 0.8,
+              strokeWeight: seg.isTrunk ? 6.5 : 5,
+              zIndex: seg.isTrunk ? 91 : 101,
+              clickable: false,
+            }}
+          />
+          {/* dashed coloured top line — trunks solid, branches dashed */}
+          {seg.isTrunk ? (
             <Polyline
-              path={path}
+              path={seg.path}
+              options={{
+                strokeColor: seg.color,
+                strokeOpacity: 0.9,
+                strokeWeight: seg.weight,
+                zIndex: 92,
+                clickable: false,
+              }}
+            />
+          ) : (
+            <Polyline
+              path={seg.path}
               options={{
                 strokeOpacity: 0,
-                strokeWeight: 3,
+                strokeWeight: seg.weight,
                 zIndex: 102,
                 clickable: false,
                 icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: color, strokeWeight: 3.2, scale: 3 },
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: seg.color, strokeWeight: seg.weight, scale: 3 },
                   offset: '0',
                   repeat: '12px',
                 }],
               }}
             />
-          </Fragment>
-        );
-      })}
+          )}
+        </Fragment>
+      ))}
 
       {/* POI markers + smart radial labels */}
       {(() => {
