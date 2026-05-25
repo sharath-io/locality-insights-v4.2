@@ -76,20 +76,36 @@ function AnalysisPage() {
     return m;
   }, [topPois]);
 
+  // POIs visible in the list (filtered by active radius).
+  const visiblePois = useMemo(() => {
+    if (radiusKm === 'all') return topPois;
+    return topPois.filter((p) => p.distanceKm <= radiusKm);
+  }, [topPois, radiusKm]);
+
+  // Auto-select all POIs inside the active radius; clearing radius keeps prior manual selection.
+  const lastRadiusRef = useRef<number | 'all'>('all');
+  useEffect(() => {
+    if (radiusKm === lastRadiusRef.current) return;
+    lastRadiusRef.current = radiusKm;
+    if (radiusKm === 'all') return;
+    setCheckedIds(new Set(topPois.filter((p) => p.distanceKm <= radiusKm).map((p) => p.id)));
+  }, [radiusKm, topPois]);
+
   const activePois = useMemo(() => {
     const set = new Map<string, PoiRow>();
     checkedIds.forEach((id) => {
       const p = poiById.get(id);
-      if (p) set.set(id, p);
+      if (p && (radiusKm === 'all' || p.distanceKm <= radiusKm)) set.set(id, p);
     });
     if (hoveredId && poiById.has(hoveredId)) {
-      set.set(hoveredId, poiById.get(hoveredId)!);
+      const p = poiById.get(hoveredId)!;
+      if (radiusKm === 'all' || p.distanceKm <= radiusKm) set.set(hoveredId, p);
     }
     return Array.from(set.values()).map((p) => ({
       ...p,
       checked: checkedIds.has(p.id),
     }));
-  }, [hoveredId, checkedIds, poiById]);
+  }, [hoveredId, checkedIds, poiById, radiusKm]);
 
   const toggleChecked = (id: string) => {
     setCheckedIds((prev) => {
