@@ -366,27 +366,42 @@ function GoogleMapInner({
     return () => window.clearInterval(id);
   }, [isLoaded]);
 
-  // Auto-fit zoom when checked POIs change, keeping the site centered.
+  // Only zoom out when a checked POI would otherwise sit outside the viewport.
+  // Default framing stays tight and focused around the SITE marker.
   const checkedPois = activePois.filter((p) => p.checked);
   const checkedKey = checkedPois.map((p) => p.id).sort().join('|');
   useEffect(() => {
     const map = mapRef.current;
     if (!map || checkedPois.length === 0) return;
+    const bounds = map.getBounds();
+    if (bounds) {
+      // Shrink safe area to ~80% of viewport so labels fit too.
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      const padLat = (ne.lat() - sw.lat()) * 0.1;
+      const padLng = (ne.lng() - sw.lng()) * 0.1;
+      const safe = new google.maps.LatLngBounds(
+        { lat: sw.lat() + padLat, lng: sw.lng() + padLng },
+        { lat: ne.lat() - padLat, lng: ne.lng() - padLng },
+      );
+      const allInside = checkedPois.every((p) =>
+        safe.contains(new google.maps.LatLng(p.lat, p.lng)),
+      );
+      if (allInside) return; // do not zoom out
+    }
     let maxDLat = 0;
     let maxDLng = 0;
     for (const p of checkedPois) {
       maxDLat = Math.max(maxDLat, Math.abs(p.lat - lat));
       maxDLng = Math.max(maxDLng, Math.abs(p.lng - lng));
     }
-    // Generous padding so POIs/labels sit comfortably inside the frame.
-    const padLat = Math.max(maxDLat * 1.6, 0.0035);
-    const padLng = Math.max(maxDLng * 1.6, 0.0035);
-    const bounds = new google.maps.LatLngBounds(
+    const padLat = Math.max(maxDLat * 1.25, 0.0025);
+    const padLng = Math.max(maxDLng * 1.25, 0.0025);
+    const fit = new google.maps.LatLngBounds(
       { lat: lat - padLat, lng: lng - padLng },
       { lat: lat + padLat, lng: lng + padLng },
     );
-    map.fitBounds(bounds, 80);
-    // fitBounds may shift center slightly; re-center on site.
+    map.fitBounds(fit, 60);
     window.setTimeout(() => map.panTo({ lat, lng }), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkedKey, lat, lng]);
