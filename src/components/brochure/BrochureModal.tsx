@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useServerFn } from '@tanstack/react-start';
-import { GoogleMap, Polyline, Circle, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import { toast } from 'sonner';
 import { Instagram, MessageCircle, Printer, Download, Link2, Save, MapPin, Compass } from 'lucide-react';
 import { useReportStore } from '@/stores/reportStore';
@@ -12,7 +12,6 @@ import { useBrochureExport } from '@/hooks/useBrochureExport';
 import {
   CATEGORY_META,
   BROCHURE_MAP_STYLES,
-  DISTANCE_RINGS,
   ROAD_TIER_STYLE,
 } from '@/lib/map-styles';
 import type { RoadSegment } from '@/types';
