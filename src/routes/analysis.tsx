@@ -426,7 +426,7 @@ function GoogleMapInner({
     return pts;
   };
 
-  const tierStyle = ROAD_TIER_STYLE;
+
 
   return (
     <GoogleMap
