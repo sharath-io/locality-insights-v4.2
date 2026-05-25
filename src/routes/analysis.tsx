@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useReportStore } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
-import { CATEGORY_META, ROAD_FOCUS_STYLES, ROAD_TIER_STYLE, DISTANCE_RINGS } from '@/lib/map-styles';
+import { CATEGORY_META, ROAD_FOCUS_STYLES } from '@/lib/map-styles';
 import BrochureModal from '@/components/brochure/BrochureModal';
 
 export const Route = createFileRoute('/analysis')({
