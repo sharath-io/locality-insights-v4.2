@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleMap, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Polyline, OverlayView, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { useServerFn } from '@tanstack/react-start';
 import { fetchRoads } from '@/lib/fetch-roads.functions';
 import type { RoadSegment } from '@/types';
@@ -48,6 +48,7 @@ function AnalysisPage() {
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [radiusKm, setRadiusKm] = useState<number | 'all'>('all');
 
   usePlacesSearch();
 
@@ -75,20 +76,36 @@ function AnalysisPage() {
     return m;
   }, [topPois]);
 
+  // POIs visible in the list (filtered by active radius).
+  const visiblePois = useMemo(() => {
+    if (radiusKm === 'all') return topPois;
+    return topPois.filter((p) => p.distanceKm <= radiusKm);
+  }, [topPois, radiusKm]);
+
+  // Auto-select all POIs inside the active radius; clearing radius keeps prior manual selection.
+  const lastRadiusRef = useRef<number | 'all'>('all');
+  useEffect(() => {
+    if (radiusKm === lastRadiusRef.current) return;
+    lastRadiusRef.current = radiusKm;
+    if (radiusKm === 'all') return;
+    setCheckedIds(new Set(topPois.filter((p) => p.distanceKm <= radiusKm).map((p) => p.id)));
+  }, [radiusKm, topPois]);
+
   const activePois = useMemo(() => {
     const set = new Map<string, PoiRow>();
     checkedIds.forEach((id) => {
       const p = poiById.get(id);
-      if (p) set.set(id, p);
+      if (p && (radiusKm === 'all' || p.distanceKm <= radiusKm)) set.set(id, p);
     });
     if (hoveredId && poiById.has(hoveredId)) {
-      set.set(hoveredId, poiById.get(hoveredId)!);
+      const p = poiById.get(hoveredId)!;
+      if (radiusKm === 'all' || p.distanceKm <= radiusKm) set.set(hoveredId, p);
     }
     return Array.from(set.values()).map((p) => ({
       ...p,
       checked: checkedIds.has(p.id),
     }));
-  }, [hoveredId, checkedIds, poiById]);
+  }, [hoveredId, checkedIds, poiById, radiusKm]);
 
   const toggleChecked = (id: string) => {
     setCheckedIds((prev) => {
@@ -131,7 +148,7 @@ function AnalysisPage() {
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
           style={{ height: '45vh' }}
         >
-          <MapView activePois={activePois} />
+          <MapView activePois={activePois} radiusKm={radiusKm} />
 
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
@@ -144,7 +161,7 @@ function AnalysisPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
-                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[60%]"
+                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[55%]"
               >
                 {Array.from(new Set(activePois.map((p) => p.type))).map((t) => {
                   const meta = CATEGORY_META[t] ?? { color: '#666' };
@@ -187,6 +204,35 @@ function AnalysisPage() {
             </div>
           )}
         </div>
+
+        {/* Radius Intelligence Mode — filter pills */}
+        <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1 bg-white border border-[#e8e2d4] rounded-full p-1 shadow-sm">
+            {([3, 5, 10, 'all'] as const).map((opt) => {
+              const active = radiusKm === opt;
+              const label = opt === 'all' ? 'All' : `Within ${opt} KM`;
+              return (
+                <button
+                  key={String(opt)}
+                  onClick={() => setRadiusKm(opt)}
+                  className={`text-[11px] tracking-wider px-4 py-2 rounded-full transition font-medium ${
+                    active
+                      ? 'bg-[var(--navy)] text-white shadow'
+                      : 'text-[var(--navy)] hover:bg-[var(--cream)]'
+                  }`}
+                  style={active && opt !== 'all' ? { background: 'var(--gold)', color: 'var(--navy)' } : undefined}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {radiusKm !== 'all' && (
+            <div className="text-[11px] text-[var(--muted)] tracking-wide">
+              Showing places within {radiusKm} KM radius
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="px-6 md:px-10 pt-12">
@@ -195,7 +241,9 @@ function AnalysisPage() {
             <div className="text-[10px] tracking-[0.25em] text-[var(--gold)] uppercase font-medium">
               Proximity Matrix
             </div>
-            <h2 className="font-heading text-[22px] text-[var(--navy)] mt-1">Nearby Intelligence</h2>
+            <h2 className="font-heading text-[22px] text-[var(--navy)] mt-1">
+              Nearby Intelligence{radiusKm !== 'all' ? ` (Within ${radiusKm} KM)` : ''}
+            </h2>
           </div>
           <AnimatePresence>
             {checkedIds.size > 0 && (
@@ -213,7 +261,7 @@ function AnalysisPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
-          {topPois.map((p, i) => {
+          {visiblePois.map((p, i) => {
             const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#666' };
             const Icon = meta.Icon;
             const isChecked = checkedIds.has(p.id);
@@ -294,7 +342,7 @@ function AnalysisPage() {
 
 type ActivePoi = PoiRow & { checked: boolean };
 
-function MapView({ activePois }: { activePois: ActivePoi[] }) {
+function MapView({ activePois, radiusKm }: { activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const keys = useMapKeys();
@@ -331,13 +379,14 @@ function MapView({ activePois }: { activePois: ActivePoi[] }) {
       apiKey={keys?.googleMapsKey}
       roads={roads}
       activePois={activePois}
+      radiusKm={radiusKm}
     />
   );
 }
 
 function GoogleMapView({
-  lat, lng, apiKey, roads, activePois,
-}: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[]; activePois: ActivePoi[] }) {
+  lat, lng, apiKey, roads, activePois, radiusKm,
+}: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[]; activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   if (!apiKey) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
@@ -345,13 +394,13 @@ function GoogleMapView({
       </div>
     );
   }
-  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} roads={roads} activePois={activePois} />;
+  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} roads={roads} activePois={activePois} radiusKm={radiusKm} />;
 }
 
 
 function GoogleMapInner({
-  lat, lng, apiKey, roads, activePois,
-}: { lat: number; lng: number; apiKey: string; roads: RoadSegment[]; activePois: ActivePoi[] }) {
+  lat, lng, apiKey, roads, activePois, radiusKm,
+}: { lat: number; lng: number; apiKey: string; roads: RoadSegment[]; activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
@@ -546,6 +595,38 @@ function GoogleMapInner({
       onUnmount={() => { mapRef.current = null; }}
       options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
     >
+      {/* Radius Intelligence — soft gold boundary + warm translucent fill */}
+      {radiusKm !== 'all' && (
+        <>
+          <Circle
+            center={{ lat, lng }}
+            radius={radiusKm * 1000}
+            options={{
+              strokeColor: '#b8954a',
+              strokeOpacity: 0.55,
+              strokeWeight: 1.2,
+              fillColor: '#e8c07a',
+              fillOpacity: 0.06,
+              clickable: false,
+              zIndex: 5,
+            }}
+          />
+          {/* faint inner accent ring */}
+          <Circle
+            center={{ lat, lng }}
+            radius={radiusKm * 1000 * 0.6}
+            options={{
+              strokeColor: '#b8954a',
+              strokeOpacity: 0.18,
+              strokeWeight: 1,
+              fillOpacity: 0,
+              clickable: false,
+              zIndex: 5,
+            }}
+          />
+        </>
+      )}
+
       {/* Shared trunked routes — clusters first (under branches), branches over */}
       {routeSegments.map((seg) => (
         <Fragment key={seg.key}>
