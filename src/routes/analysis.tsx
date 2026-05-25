@@ -507,7 +507,7 @@ function GoogleMapInner({
         // 2. Sort by angle and compute offset multipliers to relieve angular crowding.
         const sorted = [...withAngles].sort((a, b) => a.angle - b.angle);
         const offsetMap = new Map<string, number>();
-        const MIN_GAP = (28 * Math.PI) / 180; // ~28° before we push outward
+        const MIN_GAP = (32 * Math.PI) / 180;
         sorted.forEach((cur, i) => {
           if (sorted.length === 1) { offsetMap.set(cur.p.id, 1); return; }
           const prev = sorted[(i - 1 + sorted.length) % sorted.length];
@@ -518,7 +518,7 @@ function GoogleMapInner({
           };
           const tightest = Math.min(gap(cur.angle, prev.angle), gap(cur.angle, next.angle));
           let mult = 1;
-          if (tightest < MIN_GAP) mult = 1 + (i % 3) * 0.55; // alternate radial distance
+          if (tightest < MIN_GAP) mult = 1 + (i % 3) * 0.7;
           offsetMap.set(cur.p.id, mult);
         });
 
@@ -527,11 +527,10 @@ function GoogleMapInner({
           const color = meta.color;
           const Icon = meta.Icon;
           const mult = offsetMap.get(p.id) ?? 1;
-          // Push labels well outward from the marker for brochure-grade breathing room.
-          const radial = 38 + 22 * mult;
+          // Push labels well outward — clear of route lines and SITE marker.
+          const radial = 64 + 30 * mult;
           const lx = Math.cos(angle) * radial;
-          const ly = -Math.sin(angle) * radial; // back to screen-y (down positive)
-          // Quadrant → translate so label sits OUTWARD from marker.
+          const ly = -Math.sin(angle) * radial;
           const absCos = Math.abs(Math.cos(angle));
           const absSin = Math.abs(Math.sin(angle));
           let tx = '-50%';
@@ -541,7 +540,7 @@ function GoogleMapInner({
             ty = '-50%';
           } else {
             tx = '-50%';
-            ty = Math.sin(angle) > 0 ? '-100%' : '0%'; // sin>0 means up on screen → label above
+            ty = Math.sin(angle) > 0 ? '-100%' : '0%';
           }
           return (
             <OverlayView
@@ -556,37 +555,47 @@ function GoogleMapInner({
                 transition={{ duration: 0.3, ease: 'easeOut' }}
                 style={{ transform: 'translate(-50%, -50%)', position: 'relative' }}
               >
-                {/* connector line from marker to label when offset is large */}
-                {mult > 1 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      width: radial - 15,
-                      height: 1.5,
-                      background: `${color}80`,
-                      transformOrigin: '0 50%',
-                      transform: `rotate(${-angle}rad) translateX(15px)`,
-                      zIndex: 300,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                )}
-                {/* circular icon marker */}
+                {/* dashed connector from marker edge to label */}
                 <div
-                  className="relative flex items-center justify-center rounded-full border-[3px] border-white"
                   style={{
-                    width: 30,
-                    height: 30,
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    width: radial - 18,
+                    height: 0,
+                    borderTop: `1.5px dashed ${color}`,
+                    opacity: 0.7,
+                    transformOrigin: '0 50%',
+                    transform: `rotate(${-angle}rad) translateX(18px)`,
+                    zIndex: 300,
+                    pointerEvents: 'none',
+                  }}
+                />
+                {/* small dot at label connector end */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `calc(50% + ${Math.cos(angle) * (radial - 6)}px)`,
+                    top: `calc(50% + ${-Math.sin(angle) * (radial - 6)}px)`,
+                    transform: 'translate(-50%, -50%)',
+                    width: 6,
+                    height: 6,
+                    borderRadius: '9999px',
                     background: color,
-                    boxShadow: `0 4px 10px rgba(15,30,53,0.35), 0 0 0 1px ${color}40`,
-                    transform: !p.checked ? `scale(${1 + bounce * 0.12})` : undefined,
-                    transition: 'transform 220ms ease-out',
+                    zIndex: 350,
+                  }}
+                />
+                {/* circular icon marker — white background with colored icon (ref style) */}
+                <div
+                  className="relative flex items-center justify-center rounded-full bg-white"
+                  style={{
+                    width: 38,
+                    height: 38,
+                    boxShadow: `0 6px 14px rgba(15,30,53,0.18), 0 0 0 3px ${color}`,
                     zIndex: 400,
                   }}
                 >
-                  <Icon className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+                  <Icon className="w-4 h-4" style={{ color }} strokeWidth={2.5} />
                 </div>
                 {/* label chip placed radially outward */}
                 <div
@@ -599,13 +608,13 @@ function GoogleMapInner({
                   }}
                 >
                   <div
-                    className="px-2 py-1.5 rounded-md bg-white shadow-md whitespace-nowrap"
-                    style={{ borderLeft: `3px solid ${color}` }}
+                    className="px-3 py-2 rounded-lg bg-white whitespace-nowrap"
+                    style={{ boxShadow: '0 8px 22px -10px rgba(15,30,53,0.35), 0 0 0 1px rgba(15,30,53,0.06)' }}
                   >
-                    <div className="text-[10px] font-bold text-[var(--navy)] leading-tight truncate max-w-[150px]">
+                    <div className="text-[11px] font-bold text-[var(--navy)] leading-tight truncate max-w-[170px]">
                       {p.name}
                     </div>
-                    <div className="text-[9px] font-bold leading-tight mt-0.5" style={{ color }}>
+                    <div className="text-[10px] font-bold leading-tight mt-0.5" style={{ color }}>
                       {p.distanceKm.toFixed(1)} km
                     </div>
                   </div>
