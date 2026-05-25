@@ -203,10 +203,18 @@ function AnalysisPage() {
                 initial={{ opacity: 0, y: -4, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                className="flex items-center gap-2 bg-[var(--navy)] text-white text-[11px] tracking-[0.15em] uppercase px-3 py-1.5 rounded-full shadow"
+                className="flex items-center gap-3"
               >
-                <Sparkles className="w-3 h-3 text-[var(--gold)]" />
-                {checkedIds.size} selected for brochure
+                <div className="flex items-center gap-2 bg-[var(--navy)] text-white text-[11px] tracking-[0.15em] uppercase px-3 py-1.5 rounded-full shadow">
+                  <Sparkles className="w-3 h-3 text-[var(--gold)]" />
+                  {checkedIds.size} selected for brochure
+                </div>
+                <button
+                  onClick={() => setCheckedIds(new Set())}
+                  className="text-[11px] tracking-[0.15em] uppercase px-3 py-1.5 rounded-full border border-[var(--navy)]/25 text-[var(--navy)] hover:bg-[var(--navy)] hover:text-white transition"
+                >
+                  Clear Selected
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
