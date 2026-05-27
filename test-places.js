@@ -1,4 +1,4 @@
-const apiKey = process.env.GOOGLE_PLACES_KEY || "AIzaSyAxxt-4r6Z6R6qovZJXEzGrqT2-bwZflpc";
+const apiKey = process.env.GOOGLE_PLACES_KEY;
 async function run() {
   const res = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',

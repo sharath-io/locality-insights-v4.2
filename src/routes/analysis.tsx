@@ -107,9 +107,8 @@ function AnalysisPage() {
                 <button
                   key={p}
                   onClick={() => setMapProvider(p)}
-                  className={`text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full transition ${
-                    active ? 'bg-[var(--navy)] text-white' : 'text-[var(--navy)] hover:bg-[var(--cream)]'
-                  }`}
+                  className={`text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full transition ${active ? 'bg-[var(--navy)] text-white' : 'text-[var(--navy)] hover:bg-[var(--cream)]'
+                    }`}
                 >
                   {p === 'google' ? 'Google Maps' : 'Mapbox'}
                 </button>
@@ -202,7 +201,7 @@ function AnalysisPage() {
                         key={p.id}
                         className="bg-white rounded-xl p-4 border border-[#e8e2d4] shadow-sm hover:shadow-md transition-shadow flex items-start gap-3"
                       >
-                        <div 
+                        <div
                           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#faf8f4] border border-[#f0ebe0]"
                         >
                           <Icon className="w-4 h-4" style={{ color: meta.color }} />
@@ -212,7 +211,7 @@ function AnalysisPage() {
                             {p.name}
                           </h4>
                           <div className="flex items-center gap-2 text-[11px]">
-                            <span 
+                            <span
                               className="font-bold px-2 py-0.5 rounded-full"
                               style={{ background: `${meta.color}15`, color: meta.color }}
                             >
@@ -278,10 +277,10 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
         center={{ lat, lng }}
         zoom={15}
         mapTypeId={mapTypeId}
-        options={{ 
-          disableDefaultUI: true, 
-          zoomControl: true, 
-          styles: mapTypeId === 'roadmap' || mapTypeId === 'terrain' ? ROAD_FOCUS_STYLES : undefined 
+        options={{
+          disableDefaultUI: true,
+          zoomControl: true,
+          styles: mapTypeId === 'roadmap' || mapTypeId === 'terrain' ? ROAD_FOCUS_STYLES : undefined
         }}
       >
         {/* Clean minimal red location pin */}
@@ -309,13 +308,13 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
       </GoogleMap>
 
       {/* Layer Selector */}
-      <div 
+      <div
         className="absolute bottom-6 left-4 z-50 flex items-end gap-2"
         onMouseEnter={() => setShowLayers(true)}
         onMouseLeave={() => setShowLayers(false)}
       >
         {/* Main trigger button */}
-        <button 
+        <button
           className="relative w-[60px] h-[60px] rounded-xl shadow-lg border-[2px] border-white overflow-hidden transition-transform hover:scale-105"
           style={{
             background: mapTypeId === 'satellite' || mapTypeId === 'hybrid' ? '#2d3748' : '#e8e2d4',
@@ -332,7 +331,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
         {/* Expanding panel */}
         <AnimatePresence>
           {showLayers && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -10, scale: 0.95 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: -10, scale: 0.95 }}
@@ -347,17 +346,15 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                     onClick={() => setMapTypeId(type)}
                     className="flex flex-col items-center gap-1.5 w-16 group p-1"
                   >
-                    <div className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 ${
-                      isActive ? 'border-blue-500 scale-95 shadow-inner' : 'border-transparent group-hover:border-gray-300 group-hover:shadow'
-                    } overflow-hidden relative flex items-center justify-center`}
-                    style={{ background: type === 'satellite' || type === 'hybrid' ? '#2d3748' : '#e8e2d4' }}
+                    <div className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 ${isActive ? 'border-blue-500 scale-95 shadow-inner' : 'border-transparent group-hover:border-gray-300 group-hover:shadow'
+                      } overflow-hidden relative flex items-center justify-center`}
+                      style={{ background: type === 'satellite' || type === 'hybrid' ? '#2d3748' : '#e8e2d4' }}
                     >
                       {/* Simple placeholder icon for map types */}
                       <Layers className={`w-5 h-5 opacity-50 ${type === 'satellite' || type === 'hybrid' ? 'text-white' : 'text-gray-600'}`} />
                     </div>
-                    <span className={`text-[11px] capitalize transition-colors ${
-                      isActive ? 'font-bold text-blue-600' : 'font-medium text-gray-500 group-hover:text-gray-800'
-                    }`}>
+                    <span className={`text-[11px] capitalize transition-colors ${isActive ? 'font-bold text-blue-600' : 'font-medium text-gray-500 group-hover:text-gray-800'
+                      }`}>
                       {type}
                     </span>
                   </button>

@@ -44,7 +44,6 @@ const CATEGORIES: Category[] = [
   { id: 'landmarks', label: 'LANDMARKS', Icon: MapPin },
 ];
 
-const IMPORTANT_IDS = ['highways', 'schools', 'hospitals', 'metro', 'it_parks'];
 const ALL_IDS = CATEGORIES.map((c) => c.id);
 
 function parseCoordinates(input: string): { lat: number; lng: number } | null {
@@ -73,7 +72,7 @@ function parseCoordinates(input: string): { lat: number; lng: number } | null {
 export default function LandingPage() {
   const navigate = useNavigate();
   const { inputUrl, setInputUrl, setCoordinates, setSelectedCategories, setIsGenerating, setLocationReport } = useReportStore();
-  const [selected, setSelected] = useState<string[]>(ALL_IDS);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -124,7 +123,7 @@ export default function LandingPage() {
 
             <button
               onClick={handleGenerate}
-              className="mt-5 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-colors"
+              className="mt-5 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-colors cursor-pointer"
               style={{ backgroundColor: '#6b7c5e' }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#5a6a4f')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#6b7c5e')}
@@ -148,13 +147,12 @@ export default function LandingPage() {
           <div className="flex gap-2">
             {[
               { label: 'SELECT ALL', action: () => setSelected(ALL_IDS) },
-              { label: 'SELECT IMPORTANT', action: () => setSelected(IMPORTANT_IDS) },
               { label: 'CLEAR', action: () => setSelected([]) },
             ].map((b) => (
               <button
                 key={b.label}
                 onClick={b.action}
-                className="text-[10px] tracking-[0.15em] px-3 py-1.5 border border-[var(--navy)]/20 rounded text-[var(--navy)] hover:border-[var(--navy)] hover:bg-[var(--navy)] hover:text-white transition-colors"
+                className="text-[10px] tracking-[0.15em] px-3 py-1.5 border border-[var(--navy)]/20 rounded text-[var(--navy)] hover:border-[var(--navy)] hover:bg-[var(--navy)] hover:text-white transition-colors cursor-pointer"
               >
                 {b.label}
               </button>
@@ -174,7 +172,7 @@ export default function LandingPage() {
                 transition={{ delay: i * 0.03, duration: 0.3, ease: 'easeOut' }}
                 onClick={() => toggle(cat.id)}
                 whileHover={{ y: -1 }}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-lg border-2 text-left transition-all ${
+                className={`flex items-center gap-3 px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${
                   isSelected
                     ? 'border-[var(--gold)] bg-[var(--navy)]/[0.04] shadow-[0_6px_18px_-8px_rgba(15,30,53,0.35)]'
                     : 'border-[#e8e2d4] bg-white hover:border-[var(--navy)]/40 hover:shadow-sm'
