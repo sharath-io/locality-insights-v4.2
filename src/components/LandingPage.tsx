@@ -72,7 +72,7 @@ function parseCoordinates(input: string): { lat: number; lng: number } | null {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { inputUrl, setInputUrl, setCoordinates, setSelectedCategories } = useReportStore();
+  const { inputUrl, setInputUrl, setCoordinates, setSelectedCategories, setIsGenerating, setLocationReport } = useReportStore();
   const [selected, setSelected] = useState<string[]>(ALL_IDS);
 
   const toggle = (id: string) =>
@@ -80,6 +80,9 @@ export default function LandingPage() {
 
   const handleGenerate = () => {
     const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
+    // Reset stale state from any previous report before navigating
+    setIsGenerating(false);
+    setLocationReport(null);
     setSelectedCategories(labels);
     setCoordinates(parseCoordinates(inputUrl));
     navigate({ to: '/analysis' });
@@ -99,8 +102,7 @@ export default function LandingPage() {
             Analysis
           </h1>
           <p className="mt-6 font-light text-white/70 text-base md:text-lg max-w-md leading-relaxed">
-            Generate intelligent vicinity insights from any Google Maps location with
-            brochure-ready precision.
+            Generate intelligent vicinity insights from any Google Maps location.
           </p>
 
           <div className="mt-10">

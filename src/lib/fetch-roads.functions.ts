@@ -35,8 +35,8 @@ out geom;`;
     try {
       const res = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: query,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
       });
       if (!res.ok) {
         console.error('Overpass error', res.status, await res.text());

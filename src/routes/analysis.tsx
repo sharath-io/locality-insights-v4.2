@@ -1,19 +1,14 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleMap, Polyline, OverlayView, Circle, useJsApiLoader } from '@react-google-maps/api';
-import { useServerFn } from '@tanstack/react-start';
-import { fetchRoads } from '@/lib/fetch-roads.functions';
-import type { RoadSegment } from '@/types';
+import { GoogleMap, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { ArrowLeft, Sparkles, MapPin } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import { ArrowLeft, MapPin, Layers } from 'lucide-react';
 import { useReportStore } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
 import { CATEGORY_META, ROAD_FOCUS_STYLES } from '@/lib/map-styles';
-import BrochureModal from '@/components/brochure/BrochureModal';
 
 export const Route = createFileRoute('/analysis')({
   head: () => ({
@@ -24,7 +19,6 @@ export const Route = createFileRoute('/analysis')({
   }),
   component: AnalysisPage,
 });
-
 
 type PoiRow = {
   id: string;
@@ -44,11 +38,6 @@ function AnalysisPage() {
   const isGenerating = useReportStore((s) => s.isGenerating);
   const mapProvider = useReportStore((s) => s.mapProvider);
   const setMapProvider = useReportStore((s) => s.setMapProvider);
-  const setBrochureOpen = useReportStore((s) => s.setBrochureOpen);
-
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [radiusKm, setRadiusKm] = useState<number | 'all'>('all');
 
   usePlacesSearch();
 
@@ -58,7 +47,7 @@ function AnalysisPage() {
 
   const serial = locationReport?.reportId.replace(/-/g, '').slice(0, 4).toUpperCase() ?? '----';
 
-  const topPois: PoiRow[] = useMemo(() => {
+  const allPois: PoiRow[] = useMemo(() => {
     if (!locationReport) return [];
     const flat: PoiRow[] = locationReport.pois.flatMap((g) =>
       g.items.map((it) => ({
@@ -67,62 +56,17 @@ function AnalysisPage() {
         id: `${g.type}|${it.name}|${it.lat.toFixed(5)}|${it.lng.toFixed(5)}`,
       }))
     );
-    return flat.sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 15);
+    return flat.sort((a, b) => a.distanceKm - b.distanceKm);
   }, [locationReport]);
 
-  const poiById = useMemo(() => {
-    const m = new Map<string, PoiRow>();
-    topPois.forEach((p) => m.set(p.id, p));
-    return m;
-  }, [topPois]);
-
-  // POIs visible in the list (filtered by active radius).
-  const visiblePois = useMemo(() => {
-    if (radiusKm === 'all') return topPois;
-    return topPois.filter((p) => p.distanceKm <= radiusKm);
-  }, [topPois, radiusKm]);
-
-  // Auto-select all POIs inside the active radius; clearing radius keeps prior manual selection.
-  const lastRadiusRef = useRef<number | 'all'>('all');
-  useEffect(() => {
-    if (radiusKm === lastRadiusRef.current) return;
-    lastRadiusRef.current = radiusKm;
-    if (radiusKm === 'all') return;
-    setCheckedIds(new Set(topPois.filter((p) => p.distanceKm <= radiusKm).map((p) => p.id)));
-  }, [radiusKm, topPois]);
-
-  const activePois = useMemo(() => {
-    const set = new Map<string, PoiRow>();
-    checkedIds.forEach((id) => {
-      const p = poiById.get(id);
-      if (p && (radiusKm === 'all' || p.distanceKm <= radiusKm)) set.set(id, p);
-    });
-    if (hoveredId && poiById.has(hoveredId)) {
-      const p = poiById.get(hoveredId)!;
-      if (radiusKm === 'all' || p.distanceKm <= radiusKm) set.set(hoveredId, p);
+  const groupedPois = useMemo(() => {
+    const groups = new Map<string, PoiRow[]>();
+    for (const p of allPois) {
+      if (!groups.has(p.type)) groups.set(p.type, []);
+      groups.get(p.type)!.push(p);
     }
-    return Array.from(set.values()).map((p) => ({
-      ...p,
-      checked: checkedIds.has(p.id),
-    }));
-  }, [hoveredId, checkedIds, poiById, radiusKm]);
-
-  const toggleChecked = (id: string) => {
-    setCheckedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const setSelectedPois = useReportStore((s) => s.setSelectedPois);
-  useEffect(() => {
-    const list = topPois
-      .filter((p) => checkedIds.has(p.id))
-      .map(({ id, name, type, lat, lng, distanceKm }) => ({ id, name, type, lat, lng, distanceKm }));
-    setSelectedPois(list);
-  }, [checkedIds, topPois, setSelectedPois]);
+    return Array.from(groups.entries()).map(([type, items]) => ({ type, items }));
+  }, [allPois]);
 
   if (!coordinates) return null;
 
@@ -143,39 +87,19 @@ function AnalysisPage() {
         </div>
       </header>
 
+      {/* ── MAP SECTION ── */}
       <section className="px-6 md:px-10 pt-6">
         <div
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
-          style={{ height: '45vh' }}
+          style={{ height: '48vh' }}
         >
-          <MapView activePois={activePois} radiusKm={radiusKm} />
+          <MapView />
 
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
           </div>
 
-          {/* Category legend */}
-          <AnimatePresence>
-            {activePois.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow px-3 py-2 flex flex-wrap gap-x-3 gap-y-1.5 max-w-[55%]"
-              >
-                {Array.from(new Set(activePois.map((p) => p.type))).map((t) => {
-                  const meta = CATEGORY_META[t] ?? { color: '#666' };
-                  return (
-                    <div key={t} className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase font-semibold text-[var(--navy)]">
-                      <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
-                      {t}
-                    </div>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+          {/* Map provider switcher */}
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
             {(['google', 'mapbox'] as const).map((p) => {
               const active = mapProvider === p;
@@ -204,189 +128,126 @@ function AnalysisPage() {
             </div>
           )}
         </div>
+      </section>
 
-        {/* Radius Intelligence Mode — filter pills */}
-        <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1 bg-white border border-[#e8e2d4] rounded-full p-1 shadow-sm">
-            {([3, 5, 10, 'all'] as const).map((opt) => {
-              const active = radiusKm === opt;
-              const label = opt === 'all' ? 'All' : `Within ${opt} KM`;
+      {/* ── PLACES LIST (directly below map) ── */}
+      <section className="px-6 md:px-10 pt-10 max-w-7xl mx-auto">
+        <div className="mb-8">
+          <div className="text-[10px] tracking-[0.25em] text-[var(--gold)] uppercase font-medium">
+            Vicinity Intelligence
+          </div>
+          <h2 className="font-heading text-[24px] text-[var(--navy)] mt-1">
+            Important Nearby Places
+          </h2>
+        </div>
+
+        {/* Loading skeleton */}
+        {isGenerating && (
+          <div className="space-y-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#e8e2d4]" />
+                  <div className="h-5 w-48 bg-[#e8e2d4] rounded" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((j) => (
+                    <div key={j} className="h-20 bg-white rounded-xl border border-[#e8e2d4]" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isGenerating && allPois.length === 0 && (
+          <div className="text-center text-[var(--muted)] text-sm py-12 bg-white rounded-xl border border-[#e8e2d4]">
+            No nearby places found for the selected categories.
+          </div>
+        )}
+
+        {/* Categorised places grid */}
+        {!isGenerating && groupedPois.length > 0 && (
+          <div className="space-y-10">
+            {groupedPois.map(({ type, items }) => {
+              const meta = CATEGORY_META[type] ?? { Icon: MapPin, color: '#666' };
+              const Icon = meta.Icon;
+
               return (
-                <button
-                  key={String(opt)}
-                  onClick={() => setRadiusKm(opt)}
-                  className={`text-[11px] tracking-wider px-4 py-2 rounded-full transition font-medium ${
-                    active
-                      ? 'bg-[var(--navy)] text-white shadow'
-                      : 'text-[var(--navy)] hover:bg-[var(--cream)]'
-                  }`}
-                  style={active && opt !== 'all' ? { background: 'var(--gold)', color: 'var(--navy)' } : undefined}
+                <motion.div
+                  key={type}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
                 >
-                  {label}
-                </button>
+                  {/* Section header */}
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+                      style={{ background: `${meta.color}18`, color: meta.color }}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-[14px] font-bold tracking-[0.12em] text-[var(--navy)] uppercase">
+                      {type}
+                    </h3>
+                    <div className="h-px flex-1 bg-gradient-to-r from-[#e8e2d4] to-transparent ml-4" />
+                  </div>
+
+                  {/* Cards grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {items.map((p) => (
+                      <div
+                        key={p.id}
+                        className="bg-white rounded-xl p-4 border border-[#e8e2d4] shadow-sm hover:shadow-md transition-shadow flex items-start gap-3"
+                      >
+                        <div 
+                          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#faf8f4] border border-[#f0ebe0]"
+                        >
+                          <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-[13px] font-semibold text-[var(--navy)] leading-tight mb-1 truncate">
+                            {p.name}
+                          </h4>
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span 
+                              className="font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: `${meta.color}15`, color: meta.color }}
+                            >
+                              {p.distanceKm.toFixed(1)} km
+                            </span>
+                            {p.rating && p.rating > 0 && (
+                              <span className="text-[var(--muted)]">★ {p.rating.toFixed(1)}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
               );
             })}
           </div>
-          {radiusKm !== 'all' && (
-            <div className="text-[11px] text-[var(--muted)] tracking-wide">
-              Showing places within {radiusKm} KM radius
-            </div>
-          )}
-        </div>
+        )}
       </section>
-
-      <section className="px-6 md:px-10 pt-12">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-[10px] tracking-[0.25em] text-[var(--gold)] uppercase font-medium">
-              Proximity Matrix
-            </div>
-            <h2 className="font-heading text-[22px] text-[var(--navy)] mt-1">
-              Nearby Intelligence{radiusKm !== 'all' ? ` (Within ${radiusKm} KM)` : ''}
-            </h2>
-          </div>
-          <AnimatePresence>
-            {checkedIds.size > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                className="flex items-center gap-2 bg-[var(--navy)] text-white text-[11px] tracking-[0.15em] uppercase px-3 py-1.5 rounded-full shadow"
-              >
-                <Sparkles className="w-3 h-3 text-[var(--gold)]" />
-                {checkedIds.size} selected for brochure
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
-          {visiblePois.map((p, i) => {
-            const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#666' };
-            const Icon = meta.Icon;
-            const isChecked = checkedIds.has(p.id);
-            return (
-              <motion.div
-                key={p.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
-                onMouseEnter={() => setHoveredId(p.id)}
-                onMouseLeave={() => setHoveredId((h) => (h === p.id ? null : h))}
-                className={`group flex items-center gap-3 bg-white border rounded-lg pl-3 pr-4 py-3 cursor-pointer transition-all hover:shadow-md ${
-                  isChecked
-                    ? 'border-l-[3px] border-l-[var(--gold)] border-[#e8e2d4] bg-[#fbf6ea]'
-                    : 'border-[#e8e2d4]'
-                }`}
-                onClick={() => toggleChecked(p.id)}
-                style={isChecked ? { borderLeftColor: meta.color } : undefined}
-              >
-                <Checkbox
-                  checked={isChecked}
-                  onCheckedChange={() => toggleChecked(p.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="shrink-0"
-                />
-                <div
-                  className="w-9 h-9 rounded-md flex items-center justify-center shrink-0"
-                  style={{ background: `${meta.color}14`, color: meta.color }}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-semibold text-[var(--navy)] truncate">
-                    {p.name}
-                  </div>
-                  <div className="text-[9px] tracking-[0.18em] text-[var(--muted)] uppercase mt-0.5">
-                    {p.type}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-[15px] font-bold text-[var(--gold)]">
-                    {p.distanceKm.toFixed(1)} km
-                  </div>
-                  <div className="text-[9px] tracking-[0.18em] text-[var(--muted)] uppercase">
-                    Proximity
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-          {!isGenerating && topPois.length === 0 && (
-            <div className="col-span-full text-center text-[var(--muted)] text-sm py-10">
-              No nearby places found.
-            </div>
-          )}
-        </div>
-      </section>
-
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-        <button
-          onClick={() => setBrochureOpen(true)}
-          className="relative bg-[var(--gold)] text-[var(--navy)] font-medium rounded-full px-8 py-3 shadow-lg flex items-center gap-2 hover:scale-[1.02] transition"
-        >
-          <span className="absolute inset-0 rounded-full bg-[var(--gold)] animate-ping opacity-30" />
-          <Sparkles className="w-4 h-4 relative" />
-          <span className="relative">Create Brochure</span>
-          {checkedIds.size > 0 && (
-            <span className="relative ml-1 text-[11px] bg-[var(--navy)] text-white rounded-full px-2 py-0.5">
-              {checkedIds.size}
-            </span>
-          )}
-        </button>
-      </div>
-      <BrochureModal />
     </main>
   );
 }
 
-type ActivePoi = PoiRow & { checked: boolean };
-
-function MapView({ activePois, radiusKm }: { activePois: ActivePoi[]; radiusKm: number | 'all' }) {
+function MapView() {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const keys = useMapKeys();
-  const loadRoads = useServerFn(fetchRoads);
-  const [roads, setRoads] = useState<RoadSegment[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const d = 0.025;
-    loadRoads({
-      data: {
-        bbox: {
-          minLat: coordinates.lat - d,
-          maxLat: coordinates.lat + d,
-          minLng: coordinates.lng - d,
-          maxLng: coordinates.lng + d,
-        },
-      },
-    })
-      .then((r) => !cancelled && setRoads(r))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [coordinates, loadRoads]);
 
   if (mapProvider === 'mapbox') {
     return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} />;
   }
-  return (
-    <GoogleMapView
-      lat={coordinates.lat}
-      lng={coordinates.lng}
-      apiKey={keys?.googleMapsKey}
-      roads={roads}
-      activePois={activePois}
-      radiusKm={radiusKm}
-    />
-  );
+  return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
 }
 
-function GoogleMapView({
-  lat, lng, apiKey, roads, activePois, radiusKm,
-}: { lat: number; lng: number; apiKey?: string; roads: RoadSegment[]; activePois: ActivePoi[]; radiusKm: number | 'all' }) {
+function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?: string }) {
   if (!apiKey) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
@@ -394,445 +255,124 @@ function GoogleMapView({
       </div>
     );
   }
-  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} roads={roads} activePois={activePois} radiusKm={radiusKm} />;
+  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} />;
 }
 
+function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
+  const [mapTypeId, setMapTypeId] = useState<string>('roadmap');
+  const [showLayers, setShowLayers] = useState(false);
 
-function GoogleMapInner({
-  lat, lng, apiKey, roads, activePois, radiusKm,
-}: { lat: number; lng: number; apiKey: string; roads: RoadSegment[]; activePois: ActivePoi[]; radiusKm: number | 'all' }) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
   });
-  const [bounce, setBounce] = useState(0);
-  const mapRef = useRef<google.maps.Map | null>(null);
-
-  // tick to animate POI markers (CSS-like bounce via re-render of scale)
-  useEffect(() => {
-    if (!isLoaded) return;
-    const id = window.setInterval(() => setBounce((b) => (b + 1) % 2), 450);
-    return () => window.clearInterval(id);
-  }, [isLoaded]);
-
-  // Only zoom out when a checked POI would otherwise sit outside the viewport.
-  // Default framing stays tight and focused around the SITE marker.
-  const checkedPois = activePois.filter((p) => p.checked);
-  const checkedKey = checkedPois.map((p) => p.id).sort().join('|');
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || checkedPois.length === 0) return;
-    const bounds = map.getBounds();
-    if (bounds) {
-      // Shrink safe area to ~80% of viewport so labels fit too.
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      const padLat = (ne.lat() - sw.lat()) * 0.1;
-      const padLng = (ne.lng() - sw.lng()) * 0.1;
-      const safe = new google.maps.LatLngBounds(
-        { lat: sw.lat() + padLat, lng: sw.lng() + padLng },
-        { lat: ne.lat() - padLat, lng: ne.lng() - padLng },
-      );
-      const allInside = checkedPois.every((p) =>
-        safe.contains(new google.maps.LatLng(p.lat, p.lng)),
-      );
-      if (allInside) return; // do not zoom out
-    }
-    let maxDLat = 0;
-    let maxDLng = 0;
-    for (const p of checkedPois) {
-      maxDLat = Math.max(maxDLat, Math.abs(p.lat - lat));
-      maxDLng = Math.max(maxDLng, Math.abs(p.lng - lng));
-    }
-    const padLat = Math.max(maxDLat * 1.25, 0.0025);
-    const padLng = Math.max(maxDLng * 1.25, 0.0025);
-    const fit = new google.maps.LatLngBounds(
-      { lat: lat - padLat, lng: lng - padLng },
-      { lat: lat + padLat, lng: lng + padLng },
-    );
-    map.fitBounds(fit, 60);
-    window.setTimeout(() => map.panTo({ lat, lng }), 50);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkedKey, lat, lng]);
 
   if (!isLoaded) {
     return <div className="w-full h-full bg-[var(--cream)]" />;
   }
 
-
-  // Build a curved bezier path between two points with a perpendicular control offset.
-  // `stagger` shifts the curve so overlapping routes don't stack on the same path.
-  const buildCurvedPath = (
-    a: { lat: number; lng: number },
-    b: { lat: number; lng: number },
-    stagger: number,
-    curveScale = 0.18,
-  ): google.maps.LatLngLiteral[] => {
-    const steps = 32;
-    const mx = (a.lat + b.lat) / 2;
-    const my = (a.lng + b.lng) / 2;
-    const dx = b.lat - a.lat;
-    const dy = b.lng - a.lng;
-    const len = Math.hypot(dx, dy) || 1;
-    const px = -dy / len;
-    const py = dx / len;
-    const curve = len * (curveScale + stagger * 0.08);
-    const cx = mx + px * curve;
-    const cy = my + py * curve;
-    const pts: google.maps.LatLngLiteral[] = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const omt = 1 - t;
-      pts.push({
-        lat: omt * omt * a.lat + 2 * omt * t * cx + t * t * b.lat,
-        lng: omt * omt * a.lng + 2 * omt * t * cy + t * t * b.lng,
-      });
-    }
-    return pts;
-  };
-
-  // === Shared route trunking ===
-  // POIs travelling in similar directions share a thicker trunk segment outward
-  // from SITE before branching to their individual destinations. Reduces visual
-  // clutter near the center marker and creates a cleaner brochure hierarchy.
-  type RouteSegment = {
-    key: string;
-    path: google.maps.LatLngLiteral[];
-    color: string;
-    weight: number;
-    isTrunk: boolean;
-  };
-
-  const buildRouteSegments = (): RouteSegment[] => {
-    if (activePois.length === 0) return [];
-    const withGeom = activePois.map((p) => {
-      const dLat = p.lat - lat;
-      const dLng = p.lng - lng;
-      return {
-        p,
-        angle: Math.atan2(dLat, dLng),
-        dist: Math.hypot(dLat, dLng),
-      };
-    });
-
-    // Sort by angle and group consecutive POIs within CLUSTER_GAP into clusters.
-    const sorted = [...withGeom].sort((a, b) => a.angle - b.angle);
-    const CLUSTER_GAP = (30 * Math.PI) / 180;
-    const clusters: typeof sorted[] = [];
-    for (const item of sorted) {
-      const last = clusters[clusters.length - 1];
-      if (last && Math.abs(item.angle - last[last.length - 1].angle) < CLUSTER_GAP) {
-        last.push(item);
-      } else {
-        clusters.push([item]);
-      }
-    }
-    // Merge wrap-around (last + first) if angularly adjacent.
-    if (clusters.length > 1) {
-      const first = clusters[0];
-      const last = clusters[clusters.length - 1];
-      const wrapGap = 2 * Math.PI - last[last.length - 1].angle + first[0].angle;
-      if (wrapGap < CLUSTER_GAP) {
-        clusters[0] = [...last, ...first];
-        clusters.pop();
-      }
-    }
-
-    const segments: RouteSegment[] = [];
-    clusters.forEach((cluster, ci) => {
-      if (cluster.length === 1) {
-        const { p } = cluster[0];
-        const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
-        const stagger = (ci % 2 === 0 ? 1 : -1) * (0.3 + (ci % 3) * 0.25);
-        segments.push({
-          key: `solo-${p.id}`,
-          path: buildCurvedPath({ lat, lng }, { lat: p.lat, lng: p.lng }, stagger),
-          color: meta.color,
-          weight: 3.0,
-          isTrunk: false,
-        });
-        return;
-      }
-      // Cluster trunk: shared outward stem.
-      const meanAngle = cluster.reduce((s, c) => s + c.angle, 0) / cluster.length;
-      const minDist = Math.min(...cluster.map((c) => c.dist));
-      const trunkLen = minDist * 0.45;
-      const trunkEnd = {
-        lat: lat + Math.sin(meanAngle) * trunkLen,
-        lng: lng + Math.cos(meanAngle) * trunkLen,
-      };
-      segments.push({
-        key: `trunk-${ci}`,
-        path: buildCurvedPath({ lat, lng }, trunkEnd, 0, 0.08),
-        color: '#1a2a44',
-        weight: 4.2,
-        isTrunk: true,
-      });
-      cluster.forEach((c, bi) => {
-        const meta = CATEGORY_META[c.p.type] ?? { Icon: MapPin, color: '#0f1e35' };
-        const stagger = (bi - (cluster.length - 1) / 2) * 0.8;
-        segments.push({
-          key: `branch-${ci}-${c.p.id}`,
-          path: buildCurvedPath(trunkEnd, { lat: c.p.lat, lng: c.p.lng }, stagger, 0.22),
-          color: meta.color,
-          weight: 2.8,
-          isTrunk: false,
-        });
-      });
-    });
-    return segments;
-  };
-
-  const routeSegments = buildRouteSegments();
-
   return (
-    <GoogleMap
-      mapContainerStyle={{ width: '100%', height: '100%' }}
-      center={{ lat, lng }}
-      zoom={15}
-      mapTypeId="roadmap"
-      onLoad={(m) => { mapRef.current = m; }}
-      onUnmount={() => { mapRef.current = null; }}
-      options={{ disableDefaultUI: true, zoomControl: true, styles: ROAD_FOCUS_STYLES }}
-    >
-      {/* Radius Intelligence — soft gold boundary + warm translucent fill */}
-      {radiusKm !== 'all' && (
-        <>
-          <Circle
-            center={{ lat, lng }}
-            radius={radiusKm * 1000}
-            options={{
-              strokeColor: '#b8954a',
-              strokeOpacity: 0.55,
-              strokeWeight: 1.2,
-              fillColor: '#e8c07a',
-              fillOpacity: 0.06,
-              clickable: false,
-              zIndex: 5,
+    <div className="relative w-full h-full">
+      <GoogleMap
+        mapContainerStyle={{ width: '100%', height: '100%' }}
+        center={{ lat, lng }}
+        zoom={15}
+        mapTypeId={mapTypeId}
+        options={{ 
+          disableDefaultUI: true, 
+          zoomControl: true, 
+          styles: mapTypeId === 'roadmap' || mapTypeId === 'terrain' ? ROAD_FOCUS_STYLES : undefined 
+        }}
+      >
+        {/* Clean minimal red location pin */}
+        <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+          <div
+            style={{
+              transform: 'translate(-50%, -100%)',
+              zIndex: 700,
+              position: 'relative',
             }}
-          />
-          {/* faint inner accent ring */}
-          <Circle
-            center={{ lat, lng }}
-            radius={radiusKm * 1000 * 0.6}
-            options={{
-              strokeColor: '#b8954a',
-              strokeOpacity: 0.18,
-              strokeWeight: 1,
-              fillOpacity: 0,
-              clickable: false,
-              zIndex: 5,
-            }}
-          />
-        </>
-      )}
+            className="pointer-events-none"
+          >
+            <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
+                fill="#E53935"
+                stroke="#ffffff"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <circle cx="17" cy="17" r="5.5" fill="#ffffff" />
+            </svg>
+          </div>
+        </OverlayView>
+      </GoogleMap>
 
-      {/* Shared trunked routes — clusters first (under branches), branches over */}
-      {routeSegments.map((seg) => (
-        <Fragment key={seg.key}>
-          {/* soft outer glow */}
-          <Polyline
-            path={seg.path}
-            options={{
-              strokeColor: seg.color,
-              strokeOpacity: seg.isTrunk ? 0.14 : 0.10,
-              strokeWeight: seg.isTrunk ? 18 : 14,
-              zIndex: seg.isTrunk ? 90 : 100,
-              clickable: false,
-            }}
-          />
-          {/* white cushion to lift dashed line off basemap */}
-          <Polyline
-            path={seg.path}
-            options={{
-              strokeColor: '#ffffff',
-              strokeOpacity: 0.8,
-              strokeWeight: seg.isTrunk ? 6.5 : 5,
-              zIndex: seg.isTrunk ? 91 : 101,
-              clickable: false,
-            }}
-          />
-          {/* dashed coloured top line — trunks solid, branches dashed */}
-          {seg.isTrunk ? (
-            <Polyline
-              path={seg.path}
-              options={{
-                strokeColor: seg.color,
-                strokeOpacity: 0.9,
-                strokeWeight: seg.weight,
-                zIndex: 92,
-                clickable: false,
-              }}
-            />
-          ) : (
-            <Polyline
-              path={seg.path}
-              options={{
-                strokeOpacity: 0,
-                strokeWeight: seg.weight,
-                zIndex: 102,
-                clickable: false,
-                icons: [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: seg.color, strokeWeight: seg.weight, scale: 3 },
-                  offset: '0',
-                  repeat: '12px',
-                }],
-              }}
-            />
-          )}
-        </Fragment>
-      ))}
-
-      {/* POI markers + smart radial labels */}
-      {(() => {
-        // 1. Compute angle (screen-space; y flipped) for each POI relative to SITE.
-        const withAngles = activePois.map((p) => {
-          const dx = p.lng - lng;
-          const dy = -(p.lat - lat); // negate so + = up on screen
-          return { p, angle: Math.atan2(dy, dx) };
-        });
-        // 2. Sort by angle and compute offset multipliers to relieve angular crowding.
-        const sorted = [...withAngles].sort((a, b) => a.angle - b.angle);
-        const offsetMap = new Map<string, number>();
-        const MIN_GAP = (28 * Math.PI) / 180; // ~28° before we push outward
-        sorted.forEach((cur, i) => {
-          if (sorted.length === 1) { offsetMap.set(cur.p.id, 1); return; }
-          const prev = sorted[(i - 1 + sorted.length) % sorted.length];
-          const next = sorted[(i + 1) % sorted.length];
-          const gap = (a: number, b: number) => {
-            const d = Math.abs(a - b) % (2 * Math.PI);
-            return Math.min(d, 2 * Math.PI - d);
-          };
-          const tightest = Math.min(gap(cur.angle, prev.angle), gap(cur.angle, next.angle));
-          let mult = 1;
-          if (tightest < MIN_GAP) mult = 1 + (i % 3) * 0.55; // alternate radial distance
-          offsetMap.set(cur.p.id, mult);
-        });
-
-        return withAngles.map(({ p, angle }) => {
-          const meta = CATEGORY_META[p.type] ?? { Icon: MapPin, color: '#0f1e35' };
-          const color = meta.color;
-          const Icon = meta.Icon;
-          const mult = offsetMap.get(p.id) ?? 1;
-          // Push labels well outward from the marker for brochure-grade breathing room.
-          const radial = 38 + 22 * mult;
-          const lx = Math.cos(angle) * radial;
-          const ly = -Math.sin(angle) * radial; // back to screen-y (down positive)
-          // Quadrant → translate so label sits OUTWARD from marker.
-          const absCos = Math.abs(Math.cos(angle));
-          const absSin = Math.abs(Math.sin(angle));
-          let tx = '-50%';
-          let ty = '-50%';
-          if (absCos >= absSin) {
-            tx = Math.cos(angle) > 0 ? '0%' : '-100%';
-            ty = '-50%';
-          } else {
-            tx = '-50%';
-            ty = Math.sin(angle) > 0 ? '-100%' : '0%'; // sin>0 means up on screen → label above
-          }
-          return (
-            <OverlayView
-              key={p.id}
-              position={{ lat: p.lat, lng: p.lng }}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.6 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.6 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                style={{ transform: 'translate(-50%, -50%)', position: 'relative' }}
-              >
-                {/* connector line from marker to label when offset is large */}
-                {mult > 1 && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      width: radial - 15,
-                      height: 1.5,
-                      background: `${color}80`,
-                      transformOrigin: '0 50%',
-                      transform: `rotate(${-angle}rad) translateX(15px)`,
-                      zIndex: 300,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                )}
-                {/* circular icon marker */}
-                <div
-                  className="relative flex items-center justify-center rounded-full border-[3px] border-white"
-                  style={{
-                    width: 30,
-                    height: 30,
-                    background: color,
-                    boxShadow: `0 4px 10px rgba(15,30,53,0.35), 0 0 0 1px ${color}40`,
-                    transform: !p.checked ? `scale(${1 + bounce * 0.12})` : undefined,
-                    transition: 'transform 220ms ease-out',
-                    zIndex: 400,
-                  }}
-                >
-                  <Icon className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
-                </div>
-                {/* label chip placed radially outward */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `calc(50% + ${lx}px)`,
-                    top: `calc(50% + ${ly}px)`,
-                    transform: `translate(${tx}, ${ty})`,
-                    zIndex: 500,
-                  }}
-                >
-                  <div
-                    className="px-2 py-1.5 rounded-md bg-white shadow-md whitespace-nowrap"
-                    style={{ borderLeft: `3px solid ${color}` }}
-                  >
-                    <div className="text-[10px] font-bold text-[var(--navy)] leading-tight truncate max-w-[150px]">
-                      {p.name}
-                    </div>
-                    <div className="text-[9px] font-bold leading-tight mt-0.5" style={{ color }}>
-                      {p.distanceKm.toFixed(1)} km
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </OverlayView>
-          );
-        });
-      })()}
-
-      {/* Clean minimal red location pin — no glow, pulse, or heavy shadow */}
-      <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-        <div
+      {/* Layer Selector */}
+      <div 
+        className="absolute bottom-6 left-4 z-50 flex items-end gap-2"
+        onMouseEnter={() => setShowLayers(true)}
+        onMouseLeave={() => setShowLayers(false)}
+      >
+        {/* Main trigger button */}
+        <button 
+          className="relative w-[60px] h-[60px] rounded-xl shadow-lg border-[2px] border-white overflow-hidden transition-transform hover:scale-105"
           style={{
-            // Anchor the pin tip (not its center) onto the coordinate.
-            transform: 'translate(-50%, -100%)',
-            zIndex: 700,
-            position: 'relative',
+            background: mapTypeId === 'satellite' || mapTypeId === 'hybrid' ? '#2d3748' : '#e8e2d4',
           }}
-          className="pointer-events-none"
+          onClick={() => setShowLayers(!showLayers)}
         >
-          <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
-              fill="#E53935"
-              stroke="#ffffff"
-              strokeWidth="2"
-              strokeLinejoin="round"
-            />
-            <circle cx="17" cy="17" r="5.5" fill="#ffffff" />
-          </svg>
-        </div>
-      </OverlayView>
-    </GoogleMap>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
+            <Layers className="w-5 h-5 text-white drop-shadow-md mb-0.5" />
+            <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">Layers</span>
+          </div>
+        </button>
+
+        {/* Expanding panel */}
+        <AnimatePresence>
+          {showLayers && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -10, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-2 flex gap-1 mb-1"
+            >
+              {(['roadmap', 'satellite', 'hybrid', 'terrain'] as const).map(type => {
+                const isActive = mapTypeId === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setMapTypeId(type)}
+                    className="flex flex-col items-center gap-1.5 w-16 group p-1"
+                  >
+                    <div className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 ${
+                      isActive ? 'border-blue-500 scale-95 shadow-inner' : 'border-transparent group-hover:border-gray-300 group-hover:shadow'
+                    } overflow-hidden relative flex items-center justify-center`}
+                    style={{ background: type === 'satellite' || type === 'hybrid' ? '#2d3748' : '#e8e2d4' }}
+                    >
+                      {/* Simple placeholder icon for map types */}
+                      <Layers className={`w-5 h-5 opacity-50 ${type === 'satellite' || type === 'hybrid' ? 'text-white' : 'text-gray-600'}`} />
+                    </div>
+                    <span className={`text-[11px] capitalize transition-colors ${
+                      isActive ? 'font-bold text-blue-600' : 'font-medium text-gray-500 group-hover:text-gray-800'
+                    }`}>
+                      {type}
+                    </span>
+                  </button>
+                )
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }
 
 function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
 
   useEffect(() => {
     if (!token || !containerRef.current) return;
@@ -843,7 +383,6 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       center: [lng, lat],
       zoom: 14,
     });
-    mapRef.current = map;
 
     const el = document.createElement('div');
     el.style.width = '20px';
@@ -854,10 +393,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
     new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map);
 
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
+    return () => map.remove();
   }, [lat, lng, token]);
 
   if (!token) {

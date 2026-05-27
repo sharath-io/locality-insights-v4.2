@@ -8,15 +8,15 @@ const CATEGORY_TO_TYPE: Record<string, string> = {
   COLLEGES: 'university',
   'METRO/RAILWAY': 'subway_station',
   'BUS STOPS': 'bus_station',
-  'IT PARKS': 'office',
+  'IT PARKS': 'accounting',
   'SHOPPING AREAS': 'shopping_mall',
   TEMPLES: 'hindu_temple',
   RESTAURANTS: 'restaurant',
   'TOURIST ATTRACTIONS': 'tourist_attraction',
   'LAKES/PARKS': 'park',
-  LANDMARKS: 'point_of_interest',
+  LANDMARKS: 'museum',
   HIGHWAYS: 'gas_station',
-  'MAIN ROADS': 'premise',
+  'MAIN ROADS': 'transit_station',
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -42,9 +42,12 @@ export const nearbySearch = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }): Promise<LocationReport> => {
     const apiKey = process.env.GOOGLE_PLACES_KEY;
-    if (!apiKey) throw new Error('GOOGLE_PLACES_KEY not configured');
-
     const { lat, lng, categories, radiusMeters } = data;
+    console.log("SERVER: nearbySearch handler called.");
+    console.log("SERVER: Coordinates:", lat, lng);
+    console.log("SERVER: Categories:", categories);
+    console.log("SERVER: API Key defined:", !!apiKey);
+    if (!apiKey) throw new Error('GOOGLE_PLACES_KEY not configured');
 
     const groups: POIGroup[] = await Promise.all(
       categories.map(async (cat) => {
@@ -101,9 +104,13 @@ export const nearbySearch = createServerFn({ method: 'POST' })
               };
             });
 
+          if (items.length === 0) {
+            console.log(`SERVER: 0 items for ${cat}. Response:`, JSON.stringify(json).slice(0, 500));
+          }
+
           return { type: cat, items };
         } catch (err) {
-          console.error(`Failed category ${cat}:`, err);
+          console.error(`SERVER: Failed category ${cat}:`, err);
           return { type: cat, items: [] };
         }
       })
@@ -130,6 +137,9 @@ export const nearbySearch = createServerFn({ method: 'POST' })
       minLng: minLng - lngPad,
       maxLng: maxLng + lngPad,
     };
+
+    const totalPlaces = groups.reduce((n, g) => n + g.items.length, 0);
+    console.log("SERVER: Total places found: ", totalPlaces);
 
     return {
       site: { lat, lng, label: 'Site Location' },

@@ -15,8 +15,8 @@ export function usePlacesSearch() {
   useEffect(() => {
     if (!coordinates || selectedCategories.length === 0) return;
     const key = `${coordinates.lat},${coordinates.lng}|${selectedCategories.join(',')}`;
-    if (ranKeyRef.current === key) return;
-    ranKeyRef.current = key;
+    // Always run the fetch when coordinates/categories change or component mounts
+    // (We removed the ranKeyRef early return to ensure the data is fetched when navigating back)
 
     let cancelled = false;
     (async () => {
@@ -43,7 +43,9 @@ export function usePlacesSearch() {
         console.error(err);
         if (!cancelled) toast.error('Failed to load vicinity data. Please try again.');
       } finally {
-        if (!cancelled) setIsGenerating(false);
+        // Always clear the loading state — even if this effect was cleaned up
+        // (React StrictMode double-invoke), so the overlay never gets stuck.
+        setIsGenerating(false);
       }
     })();
 
