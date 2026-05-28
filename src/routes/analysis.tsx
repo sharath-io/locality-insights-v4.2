@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useMemo, useEffect, useRef, useState, useCallback, createElement } from 'react';
+import { useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleMap, OverlayView, useJsApiLoader } from '@react-google-maps/api';
@@ -368,7 +368,14 @@ function AnalysisPage() {
 function MapView() {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
+  const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
   const keys = useMapKeys();
+
+  // Fix 3: Clear hovered state whenever the provider changes so no phantom
+  // hover marker bleeds from one map implementation to the other.
+  useEffect(() => {
+    setHoveredPoi(null);
+  }, [mapProvider, setHoveredPoi]);
 
   if (mapProvider === 'mapbox') {
     return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} />;
@@ -465,7 +472,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
             }}
             className="pointer-events-none"
           >
-            <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="35" height="46" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
                 fill="#E53935"
@@ -483,7 +490,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
           const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
           const Icon = meta.Icon;
           const isThisHovered = hoveredPoi?.id === poi.id;
-          const size = isThisHovered ? 46 : 38;
+          const size = 30;
 
           return (
             <OverlayView
@@ -554,7 +561,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                   }}
                 >
                   <Icon
-                    size={isThisHovered ? 22 : 17}
+                    size={14}
                     color="white"
                     strokeWidth={2.5}
                   />
@@ -619,8 +626,8 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                   className="animate-ping"
                   style={{
                     position: 'absolute',
-                    width: 52,
-                    height: 52,
+                    width: 36,
+                    height: 36,
                     borderRadius: '50%',
                     background: meta.color,
                     opacity: 0.2,
@@ -633,11 +640,11 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                 {/* Preview circle badge (semi-transparent) */}
                 <div
                   style={{
-                    width: 38,
-                    height: 38,
+                    width: 30,
+                    height: 30,
                     borderRadius: '50%',
                     background: meta.color,
-                    border: '3px solid white',
+                    border: '2px solid white',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -647,7 +654,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                     zIndex: 1,
                   }}
                 >
-                  <Icon size={17} color="white" strokeWidth={2.5} />
+                  <Icon size={14} color="white" strokeWidth={2.5} />
                 </div>
               </div>
             </OverlayView>
@@ -726,6 +733,36 @@ const MAPBOX_STYLES = [
   { id: 'navigation-night-v1',  label: 'Nav Night',         url: 'mapbox://styles/mapbox/navigation-night-v1',  dark: true  },
 ] as const;
 
+// ── Helper: build a POI marker DOM element ────────────────────────────────
+function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } = {}) {
+  const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+  let iconSvgStr = '';
+  try {
+    iconSvgStr = renderToStaticMarkup(
+      createElement(meta.Icon, { size: 14, color: 'white', strokeWidth: 2.5 } as never)
+    );
+  } catch { /* fallback to empty */ }
+
+  const el = document.createElement('div');
+  const opacity = options.opacity ?? 1;
+  el.style.cssText = `
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: ${meta.color};
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: ${opacity < 1 ? `0 4px 16px ${meta.color}50` : '0 2px 8px rgba(0,0,0,0.28)'};
+    opacity: ${opacity};
+    cursor: pointer;
+    transition: all 0.2s ease;
+  `;
+  el.innerHTML = iconSvgStr;
+  return { el, meta };
+}
+
 function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -735,8 +772,42 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
 
   const selectedPois = useReportStore((s) => s.selectedPois);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
-  const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
   const hoveredMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  // Fix 4: useLayoutEffect keeps the ref synchronously up-to-date before any
+  // async map event callbacks read it, preventing stale-closure bugs.
+  const selectedPoisRef = useRef(selectedPois);
+  useLayoutEffect(() => { selectedPoisRef.current = selectedPois; }, [selectedPois]);
+
+  // ── Shared: add all selected POI markers to map (clears existing first) ──
+  const syncSelectedMarkersToMap = useCallback((map: mapboxgl.Map, pois: typeof selectedPois) => {
+    // Remove any existing POI markers from the DOM, then clear the ref.
+    // (When called after a style change the DOM markers are already gone,
+    //  but when called from incremental sync they need explicit removal.)
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current.clear();
+
+    for (const [categoryType, poi] of Object.entries(pois)) {
+      const { el } = createPoiMarkerEl(poi);
+
+      const popup = new mapboxgl.Popup({
+        offset: 24,
+        closeButton: false,
+        closeOnClick: false,
+        className: 'poi-popup',
+      }).setHTML(`<span>${poi.name}</span>`);
+
+      el.addEventListener('mouseenter', () => marker.getPopup()?.isOpen() === false && marker.togglePopup());
+      el.addEventListener('mouseleave', () => marker.getPopup()?.isOpen() && marker.togglePopup());
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([poi.lng, poi.lat])
+        .setPopup(popup)
+        .addTo(map);
+
+      (marker as any).__poiId = poi.id;
+      markersRef.current.set(categoryType, marker);
+    }
+  }, []);
 
   // Init map once
   useEffect(() => {
@@ -744,36 +815,60 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/navigation-night-v1',
+      style: `mapbox://styles/mapbox/${activeStyle}`,
       center: [lng, lat],
       zoom: 14,
     });
     mapRef.current = map;
 
     // Custom red SVG pin marker (site)
-    const el = document.createElement('div');
-    el.style.cursor = 'pointer';
-    el.innerHTML = `
-      <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
-          fill="#E53935" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="17" cy="17" r="5.5" fill="#ffffff"/>
-      </svg>
-    `;
-    new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
+    const addSitePin = () => {
+      const el = document.createElement('div');
+      el.style.cursor = 'pointer';
+      el.innerHTML = `
+        <svg width="35" height="46" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
+            fill="#E53935" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="17" cy="17" r="5.5" fill="#ffffff"/>
+        </svg>
+      `;
+      new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
+    };
+
+    // Fix 1: Read the store directly inside the load callback to guarantee we
+    // have the latest snapshot — not through a ref that may be stale.
+    const hydrateMarkers = () => {
+      const latestPois = useReportStore.getState().selectedPois;
+      markersRef.current.clear();
+      addSitePin();
+      syncSelectedMarkersToMap(map, latestPois);
+    };
+
+    // 'style.load' fires exactly once on initial map load AND once after every
+    // setStyle() call. Using it alone (instead of also listening to 'load')
+    // prevents hydrateMarkers from running twice on mount, which was causing
+    // duplicate markers on the map even though the store holds only one POI
+    // per category.
+    map.on('style.load', hydrateMarkers);
 
     return () => { map.remove(); mapRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, token]);
 
-  // Change style without remounting
+  // Change style without remounting — remove existing markers so style.load
+  // can re-add them cleanly via hydrateMarkers.
   useEffect(() => {
     const style = MAPBOX_STYLES.find(s => s.id === activeStyle);
     if (style && mapRef.current) {
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current.clear();
       mapRef.current.setStyle(style.url);
     }
   }, [activeStyle]);
 
-  // Sync selected POI markers
+  // Sync selected POI markers imperatively whenever selections change.
+  // style.load will handle re-hydration after style switches, so we only
+  // need to handle incremental add/remove here.
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -798,36 +893,21 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       }
 
       if (!markersRef.current.has(categoryType)) {
-        const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+        const { el } = createPoiMarkerEl(poi);
 
-        // Get the icon SVG string using renderToStaticMarkup
-        let iconSvgStr = '';
-        try {
-          iconSvgStr = renderToStaticMarkup(
-            createElement(meta.Icon, { size: 18, color: 'white', strokeWidth: 2.5 } as never)
-          );
-        } catch {
-          iconSvgStr = '';
-        }
+        const popup = new mapboxgl.Popup({
+          offset: 24,
+          closeButton: false,
+          closeOnClick: false,
+          className: 'poi-popup',
+        }).setHTML(`<span>${poi.name}</span>`);
 
-        const el = document.createElement('div');
-        el.style.cssText = `
-          width: 38px;
-          height: 38px;
-          border-radius: 50%;
-          background-color: ${meta.color};
-          border: 3px solid white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.28);
-          cursor: pointer;
-          transition: all 0.2s ease;
-        `;
-        el.innerHTML = iconSvgStr;
+        el.addEventListener('mouseenter', () => marker.getPopup()?.isOpen() === false && marker.togglePopup());
+        el.addEventListener('mouseleave', () => marker.getPopup()?.isOpen() && marker.togglePopup());
 
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
           .setLngLat([poi.lng, poi.lat])
+          .setPopup(popup)
           .addTo(map);
 
         (marker as any).__poiId = poi.id;
@@ -853,32 +933,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     const isAlreadySelected = Object.values(selectedPois).some((p) => p.id === hoveredPoi.id);
     if (isAlreadySelected) return;
 
-    const meta = CATEGORY_META[hoveredPoi.type] ?? { Icon: MapPin, color: '#666' };
-
-    let iconSvgStr = '';
-    try {
-      iconSvgStr = renderToStaticMarkup(
-        createElement(meta.Icon, { size: 18, color: 'white', strokeWidth: 2.5 } as never)
-      );
-    } catch {
-      iconSvgStr = '';
-    }
-
-    const el = document.createElement('div');
-    el.style.cssText = `
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background-color: ${meta.color};
-      border: 3px solid white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 16px ${meta.color}50;
-      opacity: 0.65;
-      transition: all 0.2s ease;
-    `;
-    el.innerHTML = iconSvgStr;
+    const { el } = createPoiMarkerEl(hoveredPoi, { opacity: 0.65 });
 
     const popup = new mapboxgl.Popup({
       offset: 28,
