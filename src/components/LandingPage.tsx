@@ -130,6 +130,28 @@ export default function LandingPage() {
             >
               Generate Vicinity Report →
             </button>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <span className="text-[10px] tracking-[0.1em] text-white/50 uppercase w-full mb-1">Quick Select:</span>
+              <button
+                onClick={() => setInputUrl("https://www.google.com/maps/place/Vasenapoli/@17.7186198,83.3314418,17z/data=!3m1!4b1!4m6!3m5!1s0x3a394527f8ebd033:0xe28c02bede9b038!8m2!3d17.7186198!4d83.3314418!16s%2Fg%2F11fb0vl5f3?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D")}
+                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                Vizag - Vasenapoli
+              </button>
+              <button
+                onClick={() => setInputUrl("https://www.google.com/maps/place/Prasads+Multiplex/@17.4129805,78.4631181,925m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bcb975afb4afadd:0xf89ea8407df6c84!8m2!3d17.4129805!4d78.465693!16s%2Fg%2F11bwpm1dpl?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D")}
+                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                Prasads Multiplex Hyd
+              </button>
+              <button
+                onClick={() => setInputUrl("https://www.google.com/maps/place/18%C2%B015'29.1%22N+79%C2%B022'21.6%22E/@18.2580937,79.372669,1842m/data=!3m1!1e3!4m4!3m3!8m2!3d18.2580937!4d79.372669?entry=tts&g_ep=EgoyMDI2MDUyNS4wIPu8ASoASAFQAw%3D%3D&skid=9d8be7de-f4f4-414a-92d1-2ca39c47ad1b")}
+                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                Singapur-Huzurabad
+              </button>
+            </div>
           </div>
         </div>
 

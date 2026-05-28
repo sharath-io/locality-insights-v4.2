@@ -368,30 +368,57 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
   );
 }
 
+const MAPBOX_STYLES = [
+  { id: 'streets-v12',          label: 'Streets',           url: 'mapbox://styles/mapbox/streets-v12',          dark: false },
+  { id: 'light-v11',            label: 'Light',             url: 'mapbox://styles/mapbox/light-v11',            dark: false },
+  { id: 'dark-v11',             label: 'Dark',              url: 'mapbox://styles/mapbox/dark-v11',             dark: true  },
+  { id: 'outdoors-v12',         label: 'Outdoors',          url: 'mapbox://styles/mapbox/outdoors-v12',         dark: false },
+  { id: 'satellite-v9',         label: 'Satellite',         url: 'mapbox://styles/mapbox/satellite-v9',         dark: true  },
+  { id: 'satellite-streets-v12',label: 'Sat. Streets',      url: 'mapbox://styles/mapbox/satellite-streets-v12',dark: true  },
+  { id: 'navigation-day-v1',    label: 'Nav Day',           url: 'mapbox://styles/mapbox/navigation-day-v1',    dark: false },
+  { id: 'navigation-night-v1',  label: 'Nav Night',         url: 'mapbox://styles/mapbox/navigation-night-v1',  dark: true  },
+] as const;
+
 function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [activeStyle, setActiveStyle] = useState('navigation-night-v1');
+  const [showLayers, setShowLayers] = useState(false);
 
+  // Init map once
   useEffect(() => {
     if (!token || !containerRef.current) return;
     mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: 'mapbox://styles/mapbox/navigation-night-v1',
       center: [lng, lat],
       zoom: 14,
     });
+    mapRef.current = map;
 
+    // Custom red SVG pin marker
     const el = document.createElement('div');
-    el.style.width = '20px';
-    el.style.height = '20px';
-    el.style.borderRadius = '50%';
-    el.style.background = '#d64545';
-    el.style.border = '3px solid white';
-    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
-    new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map);
+    el.style.cursor = 'pointer';
+    el.innerHTML = `
+      <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
+          fill="#E53935" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="17" cy="17" r="5.5" fill="#ffffff"/>
+      </svg>
+    `;
+    new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
 
-    return () => map.remove();
+    return () => { map.remove(); mapRef.current = null; };
   }, [lat, lng, token]);
+
+  // Change style without remounting
+  useEffect(() => {
+    const style = MAPBOX_STYLES.find(s => s.id === activeStyle);
+    if (style && mapRef.current) {
+      mapRef.current.setStyle(style.url);
+    }
+  }, [activeStyle]);
 
   if (!token) {
     return (
@@ -400,5 +427,74 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       </div>
     );
   }
-  return <div ref={containerRef} className="w-full h-full" />;
+
+  const currentStyleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle);
+
+  return (
+    <div className="relative w-full h-full">
+      <div ref={containerRef} className="w-full h-full" />
+
+      {/* Layer Selector */}
+      <div
+        className="absolute bottom-6 left-4 z-50 flex items-end gap-2"
+        onMouseEnter={() => setShowLayers(true)}
+        onMouseLeave={() => setShowLayers(false)}
+      >
+        {/* Main trigger button */}
+        <button
+          className="relative w-[60px] h-[60px] rounded-xl shadow-lg border-[2px] border-white overflow-hidden transition-transform hover:scale-105"
+          style={{ background: currentStyleMeta?.dark ? '#1a202c' : '#e8e2d4' }}
+          onClick={() => setShowLayers(!showLayers)}
+        >
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
+            <Layers className="w-5 h-5 text-white drop-shadow-md mb-0.5" />
+            <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">Layers</span>
+          </div>
+        </button>
+
+        {/* Expanding panel */}
+        <AnimatePresence>
+          {showLayers && (
+            <motion.div
+              initial={{ opacity: 0, x: -10, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -10, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-2 flex gap-1 mb-1 flex-wrap max-w-[320px]"
+            >
+              {MAPBOX_STYLES.map(style => {
+                const isActive = activeStyle === style.id;
+                return (
+                  <button
+                    key={style.id}
+                    onClick={() => setActiveStyle(style.id)}
+                    className="flex flex-col items-center gap-1.5 w-16 group p-1"
+                  >
+                    <div
+                      className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 overflow-hidden relative flex items-center justify-center ${
+                        isActive
+                          ? 'border-blue-500 scale-95 shadow-inner'
+                          : 'border-transparent group-hover:border-gray-300 group-hover:shadow'
+                      }`}
+                      style={{ background: style.dark ? '#1a202c' : '#e8e2d4' }}
+                    >
+                      <Layers className={`w-5 h-5 opacity-50 ${style.dark ? 'text-white' : 'text-gray-600'}`} />
+                    </div>
+                    <span className={`text-[10px] text-center leading-tight transition-colors ${
+                      isActive
+                        ? 'font-bold text-blue-600'
+                        : 'font-medium text-gray-500 group-hover:text-gray-800'
+                    }`}>
+                      {style.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 }
