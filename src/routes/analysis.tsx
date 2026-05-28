@@ -1,11 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useRef, useState, useCallback, createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleMap, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ArrowLeft, MapPin, Layers } from 'lucide-react';
 import { useReportStore } from '@/stores/reportStore';
+import type { SelectedPoiEntry } from '@/stores/reportStore';
 import { usePlacesSearch } from '@/hooks/usePlacesSearch';
 import { useMapKeys } from '@/hooks/useMapKeys';
 import { CATEGORY_META, ROAD_FOCUS_STYLES } from '@/lib/map-styles';
@@ -38,6 +40,11 @@ function AnalysisPage() {
   const isGenerating = useReportStore((s) => s.isGenerating);
   const mapProvider = useReportStore((s) => s.mapProvider);
   const setMapProvider = useReportStore((s) => s.setMapProvider);
+  const selectedPois = useReportStore((s) => s.selectedPois);
+  const selectPoi = useReportStore((s) => s.selectPoi);
+  const clearPoi = useReportStore((s) => s.clearPoi);
+  const hoveredPoi = useReportStore((s) => s.hoveredPoi);
+  const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
 
   usePlacesSearch();
 
@@ -67,6 +74,27 @@ function AnalysisPage() {
     }
     return Array.from(groups.entries()).map(([type, items]) => ({ type, items }));
   }, [allPois]);
+
+  const handleSelect = useCallback(
+    (p: PoiRow) => {
+      const current = selectedPois[p.type];
+      if (current?.id === p.id) {
+        // Clicking the already-selected POI deselects it
+        clearPoi(p.type);
+      } else {
+        // Radio: replace previous selection in this category
+        selectPoi({
+          id: p.id,
+          name: p.name,
+          type: p.type,
+          lat: p.lat,
+          lng: p.lng,
+          distanceKm: p.distanceKm,
+        });
+      }
+    },
+    [selectedPois, selectPoi, clearPoi]
+  );
 
   if (!coordinates) return null;
 
@@ -98,6 +126,27 @@ function AnalysisPage() {
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
           </div>
+
+          {/* Selected POIs legend */}
+          {Object.values(selectedPois).length > 0 && (
+            <div className="absolute top-4 right-4 flex flex-col gap-1.5 max-w-[200px]">
+              {Object.values(selectedPois).map((poi) => {
+                const meta = CATEGORY_META[poi.type] ?? { color: '#666' };
+                return (
+                  <div
+                    key={poi.id}
+                    className="flex items-center gap-2 bg-white/95 backdrop-blur px-2.5 py-1.5 rounded-lg shadow text-[11px]"
+                  >
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ background: meta.color }}
+                    />
+                    <span className="text-[var(--navy)] font-medium truncate">{poi.name.split(',')[0]} - {poi.distanceKm.toFixed(1)} km</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Map provider switcher */}
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
@@ -138,6 +187,9 @@ function AnalysisPage() {
           <h2 className="font-heading text-[24px] text-[var(--navy)] mt-1">
             Important Nearby Places
           </h2>
+          <p className="text-[12px] text-[var(--muted)] mt-1">
+            Select one location per category to pin it on the map
+          </p>
         </div>
 
         {/* Loading skeleton */}
@@ -172,6 +224,7 @@ function AnalysisPage() {
             {groupedPois.map(({ type, items }) => {
               const meta = CATEGORY_META[type] ?? { Icon: MapPin, color: '#666' };
               const Icon = meta.Icon;
+              const selectedInCategory = selectedPois[type];
 
               return (
                 <motion.div
@@ -191,39 +244,116 @@ function AnalysisPage() {
                     <h3 className="text-[14px] font-bold tracking-[0.12em] text-[var(--navy)] uppercase">
                       {type}
                     </h3>
-                    <div className="h-px flex-1 bg-gradient-to-r from-[#e8e2d4] to-transparent ml-4" />
+                    {selectedInCategory && (
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${meta.color}18`, color: meta.color }}
+                      >
+                        1 pinned
+                      </span>
+                    )}
+                    <div className="h-px flex-1 bg-gradient-to-r from-[#e8e2d4] to-transparent ml-2" />
                   </div>
 
                   {/* Cards grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {items.map((p) => (
-                      <div
-                        key={p.id}
-                        className="bg-white rounded-xl p-4 border border-[#e8e2d4] shadow-sm hover:shadow-md transition-shadow flex items-start gap-3"
-                      >
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#faf8f4] border border-[#f0ebe0]"
+                    {items.map((p) => {
+                      const isSelected = selectedInCategory?.id === p.id;
+                      const isHovered = hoveredPoi?.id === p.id;
+
+                      return (
+                        <motion.button
+                          key={p.id}
+                          onClick={() => handleSelect(p)}
+                          onMouseEnter={() => setHoveredPoi({
+                            id: p.id,
+                            name: p.name,
+                            type: p.type,
+                            lat: p.lat,
+                            lng: p.lng,
+                            distanceKm: p.distanceKm,
+                          })}
+                          onMouseLeave={() => setHoveredPoi(null)}
+                          whileHover={{ scale: 1.015 }}
+                          whileTap={{ scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          className={`
+                            w-full text-left bg-white rounded-xl p-4 border transition-all duration-200
+                            flex items-start gap-3 cursor-pointer group relative
+                            ${isSelected
+                              ? 'shadow-md'
+                              : isHovered
+                              ? 'shadow-md border-[#d4cec5]'
+                              : 'shadow-sm border-[#e8e2d4] hover:shadow-md hover:border-[#d4cec5]'
+                            }
+                          `}
+                          style={
+                            isSelected
+                              ? {
+                                  borderColor: meta.color,
+                                  boxShadow: `0 0 0 2px ${meta.color}25, 0 4px 12px ${meta.color}15`,
+                                }
+                              : {}
+                          }
                         >
-                          <Icon className="w-4 h-4" style={{ color: meta.color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-[13px] font-semibold text-[var(--navy)] leading-tight mb-1 truncate">
-                            {p.name}
-                          </h4>
-                          <div className="flex items-center gap-2 text-[11px]">
-                            <span
-                              className="font-bold px-2 py-0.5 rounded-full"
-                              style={{ background: `${meta.color}15`, color: meta.color }}
+                          {/* Radio indicator */}
+                          <div className="shrink-0 mt-0.5 flex items-center justify-center">
+                            <div
+                              className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
+                              style={{
+                                borderColor: isSelected ? meta.color : '#d4cec5',
+                                background: isSelected ? meta.color : 'transparent',
+                              }}
                             >
-                              {p.distanceKm.toFixed(1)} km
-                            </span>
-                            {p.rating && p.rating > 0 && (
-                              <span className="text-[var(--muted)]">★ {p.rating.toFixed(1)}</span>
-                            )}
+                              {isSelected && (
+                                <div className="w-2 h-2 rounded-full bg-white" />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+
+                          {/* Category icon */}
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
+                            style={{
+                              background: isSelected ? `${meta.color}20` : '#faf8f4',
+                              border: `1px solid ${isSelected ? meta.color + '40' : '#f0ebe0'}`,
+                            }}
+                          >
+                            <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[13px] font-semibold text-[var(--navy)] leading-tight mb-1 truncate">
+                              {p.name}
+                            </h4>
+                            <div className="flex items-center gap-2 text-[11px]">
+                              <span
+                                className="font-bold px-2 py-0.5 rounded-full"
+                                style={{ background: `${meta.color}15`, color: meta.color }}
+                              >
+                                {p.distanceKm.toFixed(1)} km
+                              </span>
+                              {p.rating && p.rating > 0 && (
+                                <span className="text-[var(--muted)]">★ {p.rating.toFixed(1)}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Selected badge */}
+                          {isSelected && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide text-white"
+                              style={{ background: meta.color }}
+                            >
+                              Pinned
+                            </motion.div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
                   </div>
                 </motion.div>
               );
@@ -260,11 +390,52 @@ function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?
 function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
   const [mapTypeId, setMapTypeId] = useState<string>('roadmap');
   const [showLayers, setShowLayers] = useState(false);
+  const selectedPois = useReportStore((s) => s.selectedPois);
+  const hoveredPoi = useReportStore((s) => s.hoveredPoi);
+  const mapRef = useRef<any>(null);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
   });
+
+  const poisToShow = Object.values(selectedPois);
+  // Show hovered POI as preview if it's not already checked/selected
+  const hoveredIsAlreadySelected = hoveredPoi
+    ? poisToShow.some((p) => p.id === hoveredPoi.id)
+    : false;
+
+  // Zoom to fit bounds while keeping center exactly at `lat, lng`
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    
+    const activePois = [
+      ...Object.values(selectedPois),
+      ...(hoveredPoi && !hoveredIsAlreadySelected ? [hoveredPoi] : [])
+    ];
+    
+    if (activePois.length === 0) {
+      map.setCenter({ lat, lng });
+      map.setZoom(15);
+      return;
+    }
+
+    let maxDeltaLat = 0;
+    let maxDeltaLng = 0;
+    activePois.forEach((p) => {
+      maxDeltaLat = Math.max(maxDeltaLat, Math.abs(p.lat - lat));
+      maxDeltaLng = Math.max(maxDeltaLng, Math.abs(p.lng - lng));
+    });
+    
+    if (maxDeltaLat > 0 || maxDeltaLng > 0) {
+      const PADDING_FACTOR = 1.3;
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend({ lat: lat + maxDeltaLat * PADDING_FACTOR, lng: lng + maxDeltaLng * PADDING_FACTOR });
+      bounds.extend({ lat: lat - maxDeltaLat * PADDING_FACTOR, lng: lng - maxDeltaLng * PADDING_FACTOR });
+      map.fitBounds(bounds);
+    }
+  }, [lat, lng, selectedPois, hoveredPoi, hoveredIsAlreadySelected]);
 
   if (!isLoaded) {
     return <div className="w-full h-full bg-[var(--cream)]" />;
@@ -273,6 +444,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
   return (
     <div className="relative w-full h-full">
       <GoogleMap
+        onLoad={(map) => { mapRef.current = map; }}
         mapContainerStyle={{ width: '100%', height: '100%' }}
         center={{ lat, lng }}
         zoom={15}
@@ -283,7 +455,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
           styles: mapTypeId === 'roadmap' || mapTypeId === 'terrain' ? ROAD_FOCUS_STYLES : undefined
         }}
       >
-        {/* Clean minimal red location pin */}
+        {/* Site pin (red) */}
         <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
           <div
             style={{
@@ -305,6 +477,182 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
             </svg>
           </div>
         </OverlayView>
+
+        {/* Selected POI markers — circular icon badges */}
+        {poisToShow.map((poi) => {
+          const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+          const Icon = meta.Icon;
+          const isThisHovered = hoveredPoi?.id === poi.id;
+          const size = isThisHovered ? 46 : 38;
+
+          return (
+            <OverlayView
+              key={poi.id}
+              position={{ lat: poi.lat, lng: poi.lng }}
+              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+            >
+              <div
+                style={{
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: isThisHovered ? 900 : 600,
+                  position: 'relative',
+                  pointerEvents: 'none',
+                }}
+              >
+                {/* Hover tooltip */}
+                {isThisHovered && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: `${size / 2 + 10}px`,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      whiteSpace: 'nowrap',
+                      background: '#0f1e35',
+                      color: 'white',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                      zIndex: 1000,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {poi.name}
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '5px solid transparent',
+                      borderRight: '5px solid transparent',
+                      borderTop: '5px solid #0f1e35',
+                    }} />
+                  </div>
+                )}
+
+                {/* Circular icon badge */}
+                <div
+                  style={{
+                    width: size,
+                    height: size,
+                    borderRadius: '50%',
+                    background: meta.color,
+                    border: '3px solid white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: isThisHovered
+                      ? `0 6px 20px ${meta.color}70, 0 0 0 3px ${meta.color}30`
+                      : `0 2px 10px rgba(0,0,0,0.28)`,
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                >
+                  <Icon
+                    size={isThisHovered ? 22 : 17}
+                    color="white"
+                    strokeWidth={2.5}
+                  />
+                </div>
+              </div>
+            </OverlayView>
+          );
+        })}
+
+        {/* Hovered POI preview marker (semi-transparent, temporary) */}
+        {hoveredPoi && !hoveredIsAlreadySelected && (() => {
+          const meta = CATEGORY_META[hoveredPoi.type] ?? { Icon: MapPin, color: '#666' };
+          const Icon = meta.Icon;
+          return (
+            <OverlayView
+              position={{ lat: hoveredPoi.lat, lng: hoveredPoi.lng }}
+              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+            >
+              <div
+                style={{
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 850,
+                  position: 'relative',
+                  pointerEvents: 'none',
+                }}
+              >
+                {/* Tooltip */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '33px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    whiteSpace: 'nowrap',
+                    background: '#0f1e35',
+                    color: 'white',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                    zIndex: 1000,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {hoveredPoi.name}
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 0,
+                    height: 0,
+                    borderLeft: '5px solid transparent',
+                    borderRight: '5px solid transparent',
+                    borderTop: '5px solid #0f1e35',
+                  }} />
+                </div>
+
+                {/* Semi-transparent pulse ring */}
+                <div
+                  className="animate-ping"
+                  style={{
+                    position: 'absolute',
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    background: meta.color,
+                    opacity: 0.2,
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+
+                {/* Preview circle badge (semi-transparent) */}
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: '50%',
+                    background: meta.color,
+                    border: '3px solid white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: `0 4px 16px ${meta.color}50`,
+                    opacity: 0.65,
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                >
+                  <Icon size={17} color="white" strokeWidth={2.5} />
+                </div>
+              </div>
+            </OverlayView>
+          );
+        })()}
       </GoogleMap>
 
       {/* Layer Selector */}
@@ -350,7 +698,6 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                       } overflow-hidden relative flex items-center justify-center`}
                       style={{ background: type === 'satellite' || type === 'hybrid' ? '#2d3748' : '#e8e2d4' }}
                     >
-                      {/* Simple placeholder icon for map types */}
                       <Layers className={`w-5 h-5 opacity-50 ${type === 'satellite' || type === 'hybrid' ? 'text-white' : 'text-gray-600'}`} />
                     </div>
                     <span className={`text-[11px] capitalize transition-colors ${isActive ? 'font-bold text-blue-600' : 'font-medium text-gray-500 group-hover:text-gray-800'
@@ -382,8 +729,14 @@ const MAPBOX_STYLES = [
 function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const [activeStyle, setActiveStyle] = useState('navigation-night-v1');
   const [showLayers, setShowLayers] = useState(false);
+
+  const selectedPois = useReportStore((s) => s.selectedPois);
+  const hoveredPoi = useReportStore((s) => s.hoveredPoi);
+  const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
+  const hoveredMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // Init map once
   useEffect(() => {
@@ -397,7 +750,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     });
     mapRef.current = map;
 
-    // Custom red SVG pin marker
+    // Custom red SVG pin marker (site)
     const el = document.createElement('div');
     el.style.cursor = 'pointer';
     el.innerHTML = `
@@ -419,6 +772,174 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       mapRef.current.setStyle(style.url);
     }
   }, [activeStyle]);
+
+  // Sync selected POI markers
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const currentIds = new Set(Object.keys(selectedPois));
+    const existingIds = new Set(markersRef.current.keys());
+
+    // Remove markers no longer selected
+    for (const id of existingIds) {
+      if (!currentIds.has(id)) {
+        markersRef.current.get(id)?.remove();
+        markersRef.current.delete(id);
+      }
+    }
+
+    // Add new markers / update changed ones
+    for (const [categoryType, poi] of Object.entries(selectedPois)) {
+      const existing = markersRef.current.get(categoryType);
+      // If marker exists but for a different POI (user re-selected within category), remove old
+      if (existing && (existing as any).__poiId !== poi.id) {
+        existing.remove();
+        markersRef.current.delete(categoryType);
+      }
+
+      if (!markersRef.current.has(categoryType)) {
+        const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+
+        // Get the icon SVG string using renderToStaticMarkup
+        let iconSvgStr = '';
+        try {
+          iconSvgStr = renderToStaticMarkup(
+            createElement(meta.Icon, { size: 18, color: 'white', strokeWidth: 2.5 } as never)
+          );
+        } catch {
+          iconSvgStr = '';
+        }
+
+        const el = document.createElement('div');
+        el.style.cssText = `
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background-color: ${meta.color};
+          border: 3px solid white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        `;
+        el.innerHTML = iconSvgStr;
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([poi.lng, poi.lat])
+          .addTo(map);
+
+        (marker as any).__poiId = poi.id;
+        markersRef.current.set(categoryType, marker);
+      }
+    }
+  }, [selectedPois]);
+
+  // Sync hovered POI preview marker (temporary, semi-transparent)
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove previous hovered marker
+    if (hoveredMarkerRef.current) {
+      hoveredMarkerRef.current.remove();
+      hoveredMarkerRef.current = null;
+    }
+
+    if (!hoveredPoi) return;
+
+    // Don't show preview if already selected/checked
+    const isAlreadySelected = Object.values(selectedPois).some((p) => p.id === hoveredPoi.id);
+    if (isAlreadySelected) return;
+
+    const meta = CATEGORY_META[hoveredPoi.type] ?? { Icon: MapPin, color: '#666' };
+
+    let iconSvgStr = '';
+    try {
+      iconSvgStr = renderToStaticMarkup(
+        createElement(meta.Icon, { size: 18, color: 'white', strokeWidth: 2.5 } as never)
+      );
+    } catch {
+      iconSvgStr = '';
+    }
+
+    const el = document.createElement('div');
+    el.style.cssText = `
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background-color: ${meta.color};
+      border: 3px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px ${meta.color}50;
+      opacity: 0.65;
+      transition: all 0.2s ease;
+    `;
+    el.innerHTML = iconSvgStr;
+
+    const popup = new mapboxgl.Popup({
+      offset: 28,
+      closeButton: false,
+      closeOnClick: false,
+      className: 'poi-popup',
+    }).setHTML(`<span>${hoveredPoi.name}</span>`);
+
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([hoveredPoi.lng, hoveredPoi.lat])
+      .setPopup(popup)
+      .addTo(map);
+
+    marker.togglePopup(); // show tooltip immediately
+    hoveredMarkerRef.current = marker;
+
+    return () => {
+      marker.remove();
+      hoveredMarkerRef.current = null;
+    };
+  }, [hoveredPoi, selectedPois]);
+
+  // Zoom to fit bounds while keeping center exactly at `lng, lat`
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    
+    const activePois = [
+      ...Object.values(selectedPois),
+      ...(hoveredPoi ? [hoveredPoi] : [])
+    ];
+    
+    if (activePois.length === 0) {
+      map.easeTo({ center: [lng, lat], zoom: 14, duration: 800 });
+      return;
+    }
+    
+    let maxDeltaLat = 0;
+    let maxDeltaLng = 0;
+    activePois.forEach((p) => {
+      maxDeltaLat = Math.max(maxDeltaLat, Math.abs(p.lat - lat));
+      maxDeltaLng = Math.max(maxDeltaLng, Math.abs(p.lng - lng));
+    });
+    
+    if (maxDeltaLat > 0 || maxDeltaLng > 0) {
+      const PADDING_FACTOR = 1.3;
+      const dLat = maxDeltaLat * PADDING_FACTOR;
+      const dLng = maxDeltaLng * PADDING_FACTOR;
+      
+      const bounds = new mapboxgl.LngLatBounds(
+        [lng - dLng, lat - dLat],
+        [lng + dLng, lat + dLat]
+      );
+      
+      map.fitBounds(bounds, {
+        padding: 40,
+        maxZoom: 15,
+        duration: 800
+      });
+    }
+  }, [lat, lng, selectedPois, hoveredPoi]);
 
   if (!token) {
     return (
