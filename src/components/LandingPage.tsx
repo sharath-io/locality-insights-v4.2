@@ -71,7 +71,7 @@ function parseCoordinates(input: string): { lat: number; lng: number } | null {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { inputUrl, setInputUrl, setCoordinates, setSelectedCategories, setIsGenerating, setLocationReport } = useReportStore();
+  const { inputUrl, setInputUrl, setCoordinates, setSelectedCategories, setIsGenerating, setLocationReport, resetAnalysis } = useReportStore();
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = (id: string) =>
@@ -79,7 +79,8 @@ export default function LandingPage() {
 
   const handleGenerate = () => {
     const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
-    // Reset stale state from any previous report before navigating
+    // Wipe any stale analysis state before starting a fresh report
+    resetAnalysis();
     setIsGenerating(false);
     setLocationReport(null);
     setSelectedCategories(labels);

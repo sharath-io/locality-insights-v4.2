@@ -33,6 +33,8 @@ interface ReportState {
   /** Deselect the POI for a given category */
   clearPoi: (categoryType: string) => void;
   setHoveredPoi: (poi: SelectedPoiEntry | null) => void;
+  /** Wipe all analysis data (called when leaving the analysis page) */
+  resetAnalysis: () => void;
 }
 
 export const useReportStore = create<ReportState>((set) => ({
@@ -65,4 +67,12 @@ export const useReportStore = create<ReportState>((set) => ({
     }),
 
   setHoveredPoi: (hoveredPoi) => set({ hoveredPoi }),
+
+  resetAnalysis: () =>
+    set({
+      locationReport: null,
+      isGenerating: false,
+      selectedPois: {},
+      hoveredPoi: null,
+    }),
 }));

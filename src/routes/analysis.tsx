@@ -45,12 +45,20 @@ function AnalysisPage() {
   const clearPoi = useReportStore((s) => s.clearPoi);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
+  const resetAnalysis = useReportStore((s) => s.resetAnalysis);
 
   usePlacesSearch();
 
   useEffect(() => {
     if (!coordinates) navigate({ to: '/' });
   }, [coordinates, navigate]);
+
+  // Clear all analysis state when the user leaves this page
+  useEffect(() => {
+    return () => {
+      resetAnalysis();
+    };
+  }, [resetAnalysis]);
 
   const serial = locationReport?.reportId.replace(/-/g, '').slice(0, 4).toUpperCase() ?? '----';
 
@@ -131,16 +139,14 @@ function AnalysisPage() {
           {Object.values(selectedPois).length > 0 && (
             <div className="absolute top-4 right-4 flex flex-col gap-1.5 max-w-[200px]">
               {Object.values(selectedPois).map((poi) => {
-                const meta = CATEGORY_META[poi.type] ?? { color: '#666' };
+                const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+                const Icon = meta.Icon;
                 return (
                   <div
                     key={poi.id}
                     className="flex items-center gap-2 bg-white/95 backdrop-blur px-2.5 py-1.5 rounded-lg shadow text-[11px]"
                   >
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ background: meta.color }}
-                    />
+                    <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
                     <span className="text-[var(--navy)] font-medium truncate">{poi.name.split(',')[0]} - {poi.distanceKm.toFixed(1)} km</span>
                   </div>
                 );
@@ -722,16 +728,78 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
   );
 }
 
+// Premium cinematic style palette — luxury real-estate brochure aesthetic
 const MAPBOX_STYLES = [
-  { id: 'streets-v12',          label: 'Streets',           url: 'mapbox://styles/mapbox/streets-v12',          dark: false },
-  { id: 'light-v11',            label: 'Light',             url: 'mapbox://styles/mapbox/light-v11',            dark: false },
-  { id: 'dark-v11',             label: 'Dark',              url: 'mapbox://styles/mapbox/dark-v11',             dark: true  },
-  { id: 'outdoors-v12',         label: 'Outdoors',          url: 'mapbox://styles/mapbox/outdoors-v12',         dark: false },
-  { id: 'satellite-v9',         label: 'Satellite',         url: 'mapbox://styles/mapbox/satellite-v9',         dark: true  },
-  { id: 'satellite-streets-v12',label: 'Sat. Streets',      url: 'mapbox://styles/mapbox/satellite-streets-v12',dark: true  },
-  { id: 'navigation-day-v1',    label: 'Nav Day',           url: 'mapbox://styles/mapbox/navigation-day-v1',    dark: false },
-  { id: 'navigation-night-v1',  label: 'Nav Night',         url: 'mapbox://styles/mapbox/navigation-night-v1',  dark: true  },
+  { id: 'custom',               label: 'Custom',            url: 'mapbox://styles/sharath-io/cmppx0gjn001b01s7h87a1n21', dark: true,  accent: '#c8b97e' },
+  { id: 'dark-v11',             label: 'Monochrome',        url: 'mapbox://styles/mapbox/dark-v11',             dark: true,  accent: '#c8b97e' },
+  { id: 'light-v11',            label: 'Ivory',             url: 'mapbox://styles/mapbox/light-v11',            dark: false, accent: '#8a7a5c' },
+  { id: 'satellite-v9',         label: 'Satellite',         url: 'mapbox://styles/mapbox/satellite-v9',         dark: true,  accent: '#6ec6e0' },
+  { id: 'outdoors-v12',         label: 'Terrain',           url: 'mapbox://styles/mapbox/outdoors-v12',         dark: false, accent: '#7aa89b' },
 ] as const;
+
+type MapboxStyleId = typeof MAPBOX_STYLES[number]['id'];
+
+// Flat 2D camera settings
+const CINEMATIC_PITCH = 0;
+const CINEMATIC_BEARING = 0;
+const CINEMATIC_ZOOM = 14;
+
+// Layer IDs to hide: business POIs, transit labels, dense icons
+const LAYERS_TO_HIDE = [
+  'poi-label',
+  'transit-label',
+  'road-label',
+  'airport-label',
+  'settlement-minor-label',
+  'natural-point-label',
+];
+
+// Layers to reduce opacity (subtle, not hidden)
+const ROAD_LAYERS_TO_MUTE = [
+  'road-minor',
+  'road-minor-case',
+  'road-service',
+  'road-service-case',
+  'road-path',
+];
+
+// Apply cinematic layer overrides after style loads
+function applyCinematicLayerOverrides(map: mapboxgl.Map, isDark: boolean) {
+  const allLayers = map.getStyle()?.layers ?? [];
+
+  // Hide noisy POI / transit / dense label layers
+  for (const layerId of LAYERS_TO_HIDE) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', 'none');
+    }
+  }
+
+  // Keep locality/city/major road/water labels — selectively re-enable
+  const keepVisible = ['country-label', 'state-label', 'settlement-major-label', 'settlement-subdivision-label', 'waterway-label', 'water-line-label', 'water-point-label'];
+  for (const layerId of keepVisible) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', 'visible');
+    }
+  }
+
+  // Mute minor road layers (reduce opacity)
+  for (const layerId of ROAD_LAYERS_TO_MUTE) {
+    if (map.getLayer(layerId)) {
+      try { map.setPaintProperty(layerId, 'line-opacity', 0.25); } catch { /* not a line layer */ }
+    }
+  }
+
+  // 2D mode — no 3D buildings
+
+  // Tune water color for premium aesthetic
+  for (const layer of allLayers) {
+    if (layer.id.startsWith('water') && layer.type === 'fill') {
+      try {
+        map.setPaintProperty(layer.id, 'fill-color', isDark ? '#1a2b3c' : '#c9d8e8');
+      } catch { /* skip */ }
+    }
+  }
+}
 
 // ── Helper: build a POI marker DOM element ────────────────────────────────
 function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } = {}) {
@@ -767,8 +835,12 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
-  const [activeStyle, setActiveStyle] = useState('navigation-night-v1');
+  const [activeStyle, setActiveStyle] = useState<MapboxStyleId>('custom');
   const [showLayers, setShowLayers] = useState(false);
+  // Skip the changeStyle effect on first render — the map is already initialized
+  // with activeStyle, so calling setStyle() again would fire a duplicate style.load
+  // which creates an untracked orphan marker (the ghost-marker bug).
+  const isFirstStyleRender = useRef(true);
 
   const selectedPois = useReportStore((s) => s.selectedPois);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
@@ -809,27 +881,37 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     }
   }, []);
 
-  // Init map once
+  // Init map once — cinematic real-estate camera
   useEffect(() => {
     if (!token || !containerRef.current) return;
     mapboxgl.accessToken = token;
+    const styleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle) ?? MAPBOX_STYLES[0];
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: `mapbox://styles/mapbox/${activeStyle}`,
+      style: styleMeta.url,
       center: [lng, lat],
-      zoom: 14,
+      zoom: CINEMATIC_ZOOM,
+      pitch: CINEMATIC_PITCH,
+      bearing: CINEMATIC_BEARING,
+      antialias: true,
     });
     mapRef.current = map;
 
-    // Custom red SVG pin marker (site)
+    // Custom elegant site pin (gold ring + dot)
     const addSitePin = () => {
       const el = document.createElement('div');
-      el.style.cursor = 'pointer';
+      el.style.cssText = `
+        width: 38px;
+        height: 38px;
+        cursor: pointer;
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.45));
+      `;
       el.innerHTML = `
-        <svg width="35" height="46" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
-            fill="#E53935" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-          <circle cx="17" cy="17" r="5.5" fill="#ffffff"/>
+        <svg width="38" height="46" viewBox="0 0 38 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 2C10.16 2 3 9.16 3 18c0 12.5 15.2 25.8 15.4 26 .33.27.87.27 1.2 0C19.8 43.8 35 30.5 35 18 35 9.16 27.84 2 19 2Z"
+            fill="#c8b97e" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="19" cy="18" r="5" fill="rgba(255,255,255,0.95)"/>
+          <circle cx="19" cy="18" r="2.5" fill="#c8b97e"/>
         </svg>
       `;
       new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
@@ -839,9 +921,16 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     // have the latest snapshot — not through a ref that may be stale.
     const hydrateMarkers = () => {
       const latestPois = useReportStore.getState().selectedPois;
+      const currentStyleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle) ?? MAPBOX_STYLES[0];
+      // Explicitly remove any existing DOM markers before clearing the ref.
+      // (Mapbox removes GL layers on setStyle but DOM markers survive — we must
+      // clean them up ourselves to prevent orphans.)
+      markersRef.current.forEach(m => m.remove());
       markersRef.current.clear();
       addSitePin();
       syncSelectedMarkersToMap(map, latestPois);
+      // Apply cinematic layer overrides after every style.load
+      try { applyCinematicLayerOverrides(map, currentStyleMeta.dark); } catch { /* ignore if layers not ready */ }
     };
 
     // 'style.load' fires exactly once on initial map load AND once after every
@@ -855,22 +944,31 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, token]);
 
-  // Change style without remounting — remove existing markers so style.load
-  // can re-add them cleanly via hydrateMarkers.
+  // Change style without remounting — skip on initial render to avoid
+  // firing setStyle() on a map that was already initialized with this style.
+  // That double-setStyle caused two style.load events → duplicate markers.
   useEffect(() => {
+    if (isFirstStyleRender.current) {
+      isFirstStyleRender.current = false;
+      return;
+    }
     const style = MAPBOX_STYLES.find(s => s.id === activeStyle);
     if (style && mapRef.current) {
       markersRef.current.forEach(m => m.remove());
       markersRef.current.clear();
       mapRef.current.setStyle(style.url);
+      // Restore cinematic camera after style switch
+      mapRef.current.easeTo({ pitch: CINEMATIC_PITCH, bearing: CINEMATIC_BEARING, duration: 600 });
     }
   }, [activeStyle]);
 
   // Sync selected POI markers imperatively whenever selections change.
-  // style.load will handle re-hydration after style switches, so we only
-  // need to handle incremental add/remove here.
+  // style.load handles re-hydration after style switches AND initial mount,
+  // so skip this effect while the style is still loading to avoid adding
+  // a marker that hydrateMarkers will later duplicate.
   useEffect(() => {
     if (!mapRef.current) return;
+    if (!mapRef.current.isStyleLoaded()) return;
     const map = mapRef.current;
     const currentIds = new Set(Object.keys(selectedPois));
     const existingIds = new Set(markersRef.current.keys());
@@ -967,7 +1065,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     ];
     
     if (activePois.length === 0) {
-      map.easeTo({ center: [lng, lat], zoom: 14, duration: 800 });
+      map.easeTo({ center: [lng, lat], zoom: CINEMATIC_ZOOM, pitch: CINEMATIC_PITCH, bearing: CINEMATIC_BEARING, duration: 900 });
       return;
     }
     
@@ -989,9 +1087,11 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       );
       
       map.fitBounds(bounds, {
-        padding: 40,
-        maxZoom: 15,
-        duration: 800
+        padding: 50,
+        maxZoom: 14,
+        duration: 900,
+        pitch: CINEMATIC_PITCH,
+        bearing: CINEMATIC_BEARING,
       });
     }
   }, [lat, lng, selectedPois, hoveredPoi]);
@@ -1004,28 +1104,40 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     );
   }
 
-  const currentStyleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle);
+  const currentStyleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle) ?? MAPBOX_STYLES[0];
+
+  // Swatch background colors for the layer picker
+  const swatchBg: Record<MapboxStyleId, string> = {
+    'custom':      'linear-gradient(135deg, #1c2235 0%, #2e3a55 100%)',
+    'dark-v11':    'linear-gradient(135deg, #1a1f2e 0%, #2d3450 100%)',
+    'light-v11':   'linear-gradient(135deg, #f5ede0 0%, #e8dcc8 100%)',
+    'satellite-v9':'linear-gradient(135deg, #1d3a2f 0%, #2a5240 100%)',
+    'outdoors-v12':'linear-gradient(135deg, #d4e8c4 0%, #a8c890 100%)',
+  };
 
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Layer Selector */}
+      {/* Premium Layer Selector */}
       <div
-        className="absolute bottom-6 left-4 z-50 flex items-end gap-2"
+        className="absolute bottom-5 left-4 z-50 flex items-end gap-2"
         onMouseEnter={() => setShowLayers(true)}
         onMouseLeave={() => setShowLayers(false)}
       >
-        {/* Main trigger button */}
+        {/* Trigger button */}
         <button
-          className="relative w-[60px] h-[60px] rounded-xl shadow-lg border-[2px] border-white overflow-hidden transition-transform hover:scale-105"
-          style={{ background: currentStyleMeta?.dark ? '#1a202c' : '#e8e2d4' }}
+          className="relative w-[56px] h-[56px] rounded-xl shadow-lg overflow-hidden transition-all duration-200 hover:scale-105 hover:shadow-xl"
+          style={{
+            background: swatchBg[activeStyle] ?? '#1a1f2e',
+            border: `2px solid ${currentStyleMeta.accent}55`,
+          }}
           onClick={() => setShowLayers(!showLayers)}
         >
-          <div className="absolute inset-0 bg-black/30" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
-            <Layers className="w-5 h-5 text-white drop-shadow-md mb-0.5" />
-            <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">Layers</span>
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+            <Layers className="w-4 h-4 text-white drop-shadow" />
+            <span className="text-[9px] font-semibold text-white/90 tracking-widest uppercase">Style</span>
           </div>
         </button>
 
@@ -1033,35 +1145,36 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         <AnimatePresence>
           {showLayers && (
             <motion.div
-              initial={{ opacity: 0, x: -10, scale: 0.95 }}
+              initial={{ opacity: 0, x: -8, scale: 0.96 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: -10, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-2 flex gap-1 mb-1 flex-wrap max-w-[320px]"
+              exit={{ opacity: 0, x: -8, scale: 0.96 }}
+              transition={{ duration: 0.18 }}
+              className="flex gap-2 mb-1 p-2.5 rounded-2xl shadow-2xl border"
+              style={{ background: 'rgba(12,16,26,0.88)', backdropFilter: 'blur(16px)', borderColor: 'rgba(200,185,126,0.2)' }}
             >
               {MAPBOX_STYLES.map(style => {
                 const isActive = activeStyle === style.id;
                 return (
                   <button
                     key={style.id}
-                    onClick={() => setActiveStyle(style.id)}
-                    className="flex flex-col items-center gap-1.5 w-16 group p-1"
+                    onClick={() => setActiveStyle(style.id as MapboxStyleId)}
+                    className="flex flex-col items-center gap-1.5 group"
+                    title={style.label}
                   >
                     <div
-                      className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 overflow-hidden relative flex items-center justify-center ${
-                        isActive
-                          ? 'border-blue-500 scale-95 shadow-inner'
-                          : 'border-transparent group-hover:border-gray-300 group-hover:shadow'
-                      }`}
-                      style={{ background: style.dark ? '#1a202c' : '#e8e2d4' }}
+                      className="w-14 h-12 rounded-lg transition-all duration-250 overflow-hidden relative"
+                      style={{
+                        background: swatchBg[style.id as MapboxStyleId] ?? '#1a1f2e',
+                        border: isActive ? `2px solid ${style.accent}` : '2px solid rgba(255,255,255,0.1)',
+                        boxShadow: isActive ? `0 0 0 1px ${style.accent}55, 0 4px 16px rgba(0,0,0,0.5)` : 'none',
+                        transform: isActive ? 'scale(0.95)' : 'scale(1)',
+                      }}
                     >
-                      <Layers className={`w-5 h-5 opacity-50 ${style.dark ? 'text-white' : 'text-gray-600'}`} />
+                      {/* Mini map preview lines */}
+                      <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.15) 6px, rgba(255,255,255,0.15) 7px)' }} />
                     </div>
-                    <span className={`text-[10px] text-center leading-tight transition-colors ${
-                      isActive
-                        ? 'font-bold text-blue-600'
-                        : 'font-medium text-gray-500 group-hover:text-gray-800'
-                    }`}>
+                    <span className="text-[9px] tracking-wider uppercase font-medium transition-colors"
+                      style={{ color: isActive ? style.accent : 'rgba(255,255,255,0.5)' }}>
                       {style.label}
                     </span>
                   </button>
