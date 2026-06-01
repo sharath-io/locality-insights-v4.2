@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { motion } from 'framer-motion';
+import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import {
   MapPin,
   Route as RouteIcon,
@@ -18,8 +18,8 @@ import {
   Trees,
   Check,
   type LucideIcon,
-} from 'lucide-react';
-import { useReportStore } from '@/stores/reportStore';
+} from "lucide-react";
+import { useReportStore } from "@/stores/reportStore";
 
 interface Category {
   id: string;
@@ -28,20 +28,20 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
-  { id: 'highways', label: 'HIGHWAYS', Icon: RouteIcon },
-  { id: 'main_roads', label: 'MAIN ROADS', Icon: Navigation },
-  { id: 'schools', label: 'SCHOOLS', Icon: GraduationCap },
-  { id: 'colleges', label: 'COLLEGES', Icon: BookOpen },
-  { id: 'hospitals', label: 'HOSPITALS', Icon: Hospital },
-  { id: 'temples', label: 'TEMPLES', Icon: Landmark },
-  { id: 'tourist', label: 'TOURIST ATTRACTIONS', Icon: Camera },
-  { id: 'shopping', label: 'SHOPPING AREAS', Icon: ShoppingBag },
-  { id: 'metro', label: 'METRO/RAILWAY', Icon: Train },
-  { id: 'bus', label: 'BUS STOPS', Icon: Bus },
-  { id: 'it_parks', label: 'IT PARKS', Icon: Building2 },
-  { id: 'restaurants', label: 'RESTAURANTS', Icon: UtensilsCrossed },
-  { id: 'lakes_parks', label: 'LAKES/PARKS', Icon: Trees },
-  { id: 'landmarks', label: 'LANDMARKS', Icon: MapPin },
+  { id: "highways", label: "HIGHWAYS", Icon: RouteIcon },
+  { id: "main_roads", label: "MAIN ROADS", Icon: Navigation },
+  { id: "schools", label: "SCHOOLS", Icon: GraduationCap },
+  { id: "colleges", label: "COLLEGES", Icon: BookOpen },
+  { id: "hospitals", label: "HOSPITALS", Icon: Hospital },
+  { id: "temples", label: "TEMPLES", Icon: Landmark },
+  { id: "tourist", label: "TOURIST ATTRACTIONS", Icon: Camera },
+  { id: "shopping", label: "SHOPPING AREAS", Icon: ShoppingBag },
+  { id: "metro", label: "METRO/RAILWAY", Icon: Train },
+  { id: "bus", label: "BUS STOPS", Icon: Bus },
+  { id: "it_parks", label: "IT PARKS", Icon: Building2 },
+  { id: "restaurants", label: "RESTAURANTS", Icon: UtensilsCrossed },
+  { id: "lakes_parks", label: "LAKES/PARKS", Icon: Trees },
+  { id: "landmarks", label: "LANDMARKS", Icon: MapPin },
 ];
 
 const ALL_IDS = CATEGORIES.map((c) => c.id);
@@ -71,7 +71,15 @@ function parseCoordinates(input: string): { lat: number; lng: number } | null {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { inputUrl, setInputUrl, setCoordinates, setSelectedCategories, setIsGenerating, setLocationReport, resetAnalysis } = useReportStore();
+  const {
+    inputUrl,
+    setInputUrl,
+    setCoordinates,
+    setSelectedCategories,
+    setIsGenerating,
+    setLocationReport,
+    resetAnalysis,
+  } = useReportStore();
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = (id: string) =>
@@ -85,7 +93,7 @@ export default function LandingPage() {
     setLocationReport(null);
     setSelectedCategories(labels);
     setCoordinates(parseCoordinates(inputUrl));
-    navigate({ to: '/analysis' });
+    navigate({ to: "/analysis" });
   };
 
   return (
@@ -95,7 +103,7 @@ export default function LandingPage() {
         <div>
           <h1
             className="font-heading font-bold leading-[1.05] text-white"
-            style={{ fontSize: 'clamp(36px, 5vw, 52px)' }}
+            style={{ fontSize: "clamp(36px, 5vw, 52px)" }}
           >
             Locality
             <br />
@@ -125,29 +133,43 @@ export default function LandingPage() {
             <button
               onClick={handleGenerate}
               className="mt-5 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-colors cursor-pointer"
-              style={{ backgroundColor: '#6b7c5e' }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#5a6a4f')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#6b7c5e')}
+              style={{ backgroundColor: "#6b7c5e" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#5a6a4f")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#6b7c5e")}
             >
               Generate Vicinity Report →
             </button>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <span className="text-[10px] tracking-[0.1em] text-white/50 uppercase w-full mb-1">Quick Select:</span>
+              <span className="text-[10px] tracking-[0.1em] text-white/50 uppercase w-full mb-1">
+                Quick Select:
+              </span>
               <button
-                onClick={() => setInputUrl("https://www.google.com/maps/place/Vasenapoli/@17.7186198,83.3314418,17z/data=!3m1!4b1!4m6!3m5!1s0x3a394527f8ebd033:0xe28c02bede9b038!8m2!3d17.7186198!4d83.3314418!16s%2Fg%2F11fb0vl5f3?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D")}
+                onClick={() =>
+                  setInputUrl(
+                    "https://www.google.com/maps/place/Vasenapoli/@17.7186198,83.3314418,17z/data=!3m1!4b1!4m6!3m5!1s0x3a394527f8ebd033:0xe28c02bede9b038!8m2!3d17.7186198!4d83.3314418!16s%2Fg%2F11fb0vl5f3?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D",
+                  )
+                }
                 className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               >
                 Vizag - Vasenapoli
               </button>
               <button
-                onClick={() => setInputUrl("https://www.google.com/maps/place/Prasads+Multiplex/@17.4129805,78.4631181,925m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bcb975afb4afadd:0xf89ea8407df6c84!8m2!3d17.4129805!4d78.465693!16s%2Fg%2F11bwpm1dpl?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D")}
+                onClick={() =>
+                  setInputUrl(
+                    "https://www.google.com/maps/place/Prasads+Multiplex/@17.4129805,78.4631181,925m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bcb975afb4afadd:0xf89ea8407df6c84!8m2!3d17.4129805!4d78.465693!16s%2Fg%2F11bwpm1dpl?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D",
+                  )
+                }
                 className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               >
                 Prasads Multiplex Hyd
               </button>
               <button
-                onClick={() => setInputUrl("https://www.google.com/maps/place/18%C2%B015'29.1%22N+79%C2%B022'21.6%22E/@18.2580937,79.372669,1842m/data=!3m1!1e3!4m4!3m3!8m2!3d18.2580937!4d79.372669?entry=tts&g_ep=EgoyMDI2MDUyNS4wIPu8ASoASAFQAw%3D%3D&skid=9d8be7de-f4f4-414a-92d1-2ca39c47ad1b")}
+                onClick={() =>
+                  setInputUrl(
+                    "https://www.google.com/maps/place/18%C2%B015'29.1%22N+79%C2%B022'21.6%22E/@18.2580937,79.372669,1842m/data=!3m1!1e3!4m4!3m3!8m2!3d18.2580937!4d79.372669?entry=tts&g_ep=EgoyMDI2MDUyNS4wIPu8ASoASAFQAw%3D%3D&skid=9d8be7de-f4f4-414a-92d1-2ca39c47ad1b",
+                  )
+                }
                 className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               >
                 Singapur-Huzurabad
@@ -169,8 +191,8 @@ export default function LandingPage() {
           </h2>
           <div className="flex gap-2">
             {[
-              { label: 'SELECT ALL', action: () => setSelected(ALL_IDS) },
-              { label: 'CLEAR', action: () => setSelected([]) },
+              { label: "SELECT ALL", action: () => setSelected(ALL_IDS) },
+              { label: "CLEAR", action: () => setSelected([]) },
             ].map((b) => (
               <button
                 key={b.label}
@@ -192,32 +214,32 @@ export default function LandingPage() {
                 key={cat.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03, duration: 0.3, ease: 'easeOut' }}
+                transition={{ delay: i * 0.03, duration: 0.3, ease: "easeOut" }}
                 onClick={() => toggle(cat.id)}
                 whileHover={{ y: -1 }}
                 className={`flex items-center gap-3 px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${
                   isSelected
-                    ? 'border-[var(--gold)] bg-[var(--navy)]/[0.04] shadow-[0_6px_18px_-8px_rgba(15,30,53,0.35)]'
-                    : 'border-[#e8e2d4] bg-white hover:border-[var(--navy)]/40 hover:shadow-sm'
+                    ? "border-[var(--gold)] bg-[var(--navy)]/[0.04] shadow-[0_6px_18px_-8px_rgba(15,30,53,0.35)]"
+                    : "border-[#e8e2d4] bg-white hover:border-[var(--navy)]/40 hover:shadow-sm"
                 }`}
               >
                 <span
                   className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
                     isSelected
-                      ? 'bg-[var(--navy)] border-[var(--navy)]'
-                      : 'border-[#cfc7b3] bg-white'
+                      ? "bg-[var(--navy)] border-[var(--navy)]"
+                      : "border-[#cfc7b3] bg-white"
                   }`}
                 >
                   {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
                 </span>
                 <Icon
                   size={18}
-                  className={isSelected ? 'text-[var(--navy)]' : 'text-[var(--navy)]/70'}
+                  className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"}
                   strokeWidth={isSelected ? 2.25 : 1.75}
                 />
                 <span
                   className={`text-[11px] font-semibold tracking-wider ${
-                    isSelected ? 'text-[var(--navy)]' : 'text-[var(--navy)]/80'
+                    isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"
                   }`}
                 >
                   {cat.label}

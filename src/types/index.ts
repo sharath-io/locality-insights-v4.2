@@ -27,7 +27,7 @@ export interface LocationReport {
 }
 
 export interface RoadSegment {
-  tier: 'highway' | 'main' | 'local';
+  tier: "highway" | "main" | "local";
   name: string;
   points: Array<{ lat: number; lng: number }>;
 }

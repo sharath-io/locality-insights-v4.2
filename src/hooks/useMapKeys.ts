@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useServerFn } from '@tanstack/react-start';
-import { getMapKeys } from '@/lib/nearby-search.functions';
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { getMapKeys } from "@/lib/nearby-search.functions";
 
 let cached: { googleMapsKey: string; mapboxToken: string } | null = null;
 

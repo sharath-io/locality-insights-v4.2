@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import type { LocationReport } from '@/types';
+import { create } from "zustand";
+import type { LocationReport } from "@/types";
 
 export type SelectedPoiEntry = {
   id: string;
@@ -16,7 +16,7 @@ interface ReportState {
   selectedCategories: string[];
   locationReport: LocationReport | null;
   isGenerating: boolean;
-  mapProvider: 'google' | 'mapbox';
+  mapProvider: "google" | "mapbox";
   /** One selected POI per category type (key = category string) */
   selectedPois: Record<string, SelectedPoiEntry>;
   /** Full data of the POI card currently being hovered (for temp map preview) */
@@ -27,7 +27,7 @@ interface ReportState {
   setSelectedCategories: (v: string[]) => void;
   setLocationReport: (v: LocationReport | null) => void;
   setIsGenerating: (v: boolean) => void;
-  setMapProvider: (v: 'google' | 'mapbox') => void;
+  setMapProvider: (v: "google" | "mapbox") => void;
   /** Select a POI for its category (replaces any previous selection in that category) */
   selectPoi: (poi: SelectedPoiEntry) => void;
   /** Deselect the POI for a given category */
@@ -35,17 +35,20 @@ interface ReportState {
   setHoveredPoi: (poi: SelectedPoiEntry | null) => void;
   /** Wipe all analysis data (called when leaving the analysis page) */
   resetAnalysis: () => void;
+  activeMapStyleId: string;
+  setActiveMapStyleId: (id: string) => void;
 }
 
 export const useReportStore = create<ReportState>((set) => ({
-  inputUrl: '',
+  inputUrl: "",
   coordinates: null,
   selectedCategories: [],
   locationReport: null,
   isGenerating: false,
-  mapProvider: 'google',
+  mapProvider: "google",
   selectedPois: {},
   hoveredPoi: null,
+  activeMapStyleId: "default",
 
   setInputUrl: (inputUrl) => set({ inputUrl }),
   setCoordinates: (coordinates) => set({ coordinates }),
@@ -53,6 +56,7 @@ export const useReportStore = create<ReportState>((set) => ({
   setLocationReport: (locationReport) => set({ locationReport }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setMapProvider: (mapProvider) => set({ mapProvider }),
+  setActiveMapStyleId: (activeMapStyleId) => set({ activeMapStyleId }),
 
   selectPoi: (poi) =>
     set((state) => ({

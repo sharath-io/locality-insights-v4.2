@@ -1,22 +1,32 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback, createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleMap, OverlayView, useJsApiLoader } from '@react-google-maps/api';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import { ArrowLeft, MapPin, Layers } from 'lucide-react';
-import { useReportStore } from '@/stores/reportStore';
-import type { SelectedPoiEntry } from '@/stores/reportStore';
-import { usePlacesSearch } from '@/hooks/usePlacesSearch';
-import { useMapKeys } from '@/hooks/useMapKeys';
-import { CATEGORY_META, ROAD_FOCUS_STYLES } from '@/lib/map-styles';
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  createElement,
+} from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { motion, AnimatePresence } from "framer-motion";
+import { GoogleMap, OverlayView, useJsApiLoader } from "@react-google-maps/api";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { ArrowLeft, MapPin, Layers } from "lucide-react";
+import { useReportStore } from "@/stores/reportStore";
+import type { SelectedPoiEntry } from "@/stores/reportStore";
+import { usePlacesSearch } from "@/hooks/usePlacesSearch";
+import { useMapKeys } from "@/hooks/useMapKeys";
+import { CATEGORY_META, ROAD_FOCUS_STYLES } from "@/lib/map-styles";
+import { MapStyleSwitcher } from "@/components/MapStyleSwitcher";
+import { MAP_STYLES } from "@/styles/mapStyles";
 
-export const Route = createFileRoute('/analysis')({
+export const Route = createFileRoute("/analysis")({
   head: () => ({
     meta: [
-      { title: 'Vicinity Analysis — LocateIQ' },
-      { name: 'description', content: 'Intelligent vicinity insights for any location.' },
+      { title: "Vicinity Analysis — LocateIQ" },
+      { name: "description", content: "Intelligent vicinity insights for any location." },
     ],
   }),
   component: AnalysisPage,
@@ -50,7 +60,7 @@ function AnalysisPage() {
   usePlacesSearch();
 
   useEffect(() => {
-    if (!coordinates) navigate({ to: '/' });
+    if (!coordinates) navigate({ to: "/" });
   }, [coordinates, navigate]);
 
   // Clear all analysis state when the user leaves this page
@@ -60,7 +70,7 @@ function AnalysisPage() {
     };
   }, [resetAnalysis]);
 
-  const serial = locationReport?.reportId.replace(/-/g, '').slice(0, 4).toUpperCase() ?? '----';
+  const serial = locationReport?.reportId.replace(/-/g, "").slice(0, 4).toUpperCase() ?? "----";
 
   const allPois: PoiRow[] = useMemo(() => {
     if (!locationReport) return [];
@@ -69,7 +79,7 @@ function AnalysisPage() {
         ...it,
         type: g.type,
         id: `${g.type}|${it.name}|${it.lat.toFixed(5)}|${it.lng.toFixed(5)}`,
-      }))
+      })),
     );
     return flat.sort((a, b) => a.distanceKm - b.distanceKm);
   }, [locationReport]);
@@ -101,7 +111,7 @@ function AnalysisPage() {
         });
       }
     },
-    [selectedPois, selectPoi, clearPoi]
+    [selectedPois, selectPoi, clearPoi],
   );
 
   if (!coordinates) return null;
@@ -110,7 +120,7 @@ function AnalysisPage() {
     <main className="min-h-screen bg-[var(--cream)] font-body pb-32">
       <header className="flex items-center justify-between px-6 md:px-10 py-5 border-b border-[#e8e2d4]">
         <button
-          onClick={() => navigate({ to: '/' })}
+          onClick={() => navigate({ to: "/" })}
           className="flex items-center gap-2 text-[var(--navy)] hover:opacity-70 transition text-sm font-medium"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Search
@@ -127,7 +137,7 @@ function AnalysisPage() {
       <section className="px-6 md:px-10 pt-6">
         <div
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
-          style={{ height: '48vh' }}
+          style={{ height: "48vh" }}
         >
           <MapView />
 
@@ -139,7 +149,7 @@ function AnalysisPage() {
           {Object.values(selectedPois).length > 0 && (
             <div className="absolute top-4 right-4 flex flex-col gap-1.5 max-w-[200px]">
               {Object.values(selectedPois).map((poi) => {
-                const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+                const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
                 const Icon = meta.Icon;
                 return (
                   <div
@@ -147,7 +157,9 @@ function AnalysisPage() {
                     className="flex items-center gap-2 bg-white/95 backdrop-blur px-2.5 py-1.5 rounded-lg shadow text-[11px]"
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
-                    <span className="text-[var(--navy)] font-medium truncate">{poi.name.split(',')[0]} - {poi.distanceKm.toFixed(1)} km</span>
+                    <span className="text-[var(--navy)] font-medium truncate">
+                      {poi.name.split(",")[0]} - {poi.distanceKm.toFixed(1)} km
+                    </span>
                   </div>
                 );
               })}
@@ -156,16 +168,19 @@ function AnalysisPage() {
 
           {/* Map provider switcher */}
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
-            {(['google', 'mapbox'] as const).map((p) => {
+            {(["google", "mapbox"] as const).map((p) => {
               const active = mapProvider === p;
               return (
                 <button
                   key={p}
                   onClick={() => setMapProvider(p)}
-                  className={`text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full transition ${active ? 'bg-[var(--navy)] text-white' : 'text-[var(--navy)] hover:bg-[var(--cream)]'
-                    }`}
+                  className={`text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full transition ${
+                    active
+                      ? "bg-[var(--navy)] text-white"
+                      : "text-[var(--navy)] hover:bg-[var(--cream)]"
+                  }`}
                 >
-                  {p === 'google' ? 'Google Maps' : 'Mapbox'}
+                  {p === "google" ? "Google Maps" : "Mapbox"}
                 </button>
               );
             })}
@@ -181,6 +196,11 @@ function AnalysisPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Style selection below map */}
+        <div className="mt-3 flex justify-end">
+          <MapStyleSwitcher />
         </div>
       </section>
 
@@ -228,7 +248,7 @@ function AnalysisPage() {
         {!isGenerating && groupedPois.length > 0 && (
           <div className="space-y-10">
             {groupedPois.map(({ type, items }) => {
-              const meta = CATEGORY_META[type] ?? { Icon: MapPin, color: '#666' };
+              const meta = CATEGORY_META[type] ?? { Icon: MapPin, color: "#666" };
               const Icon = meta.Icon;
               const selectedInCategory = selectedPois[type];
 
@@ -271,14 +291,16 @@ function AnalysisPage() {
                         <motion.button
                           key={p.id}
                           onClick={() => handleSelect(p)}
-                          onMouseEnter={() => setHoveredPoi({
-                            id: p.id,
-                            name: p.name,
-                            type: p.type,
-                            lat: p.lat,
-                            lng: p.lng,
-                            distanceKm: p.distanceKm,
-                          })}
+                          onMouseEnter={() =>
+                            setHoveredPoi({
+                              id: p.id,
+                              name: p.name,
+                              type: p.type,
+                              lat: p.lat,
+                              lng: p.lng,
+                              distanceKm: p.distanceKm,
+                            })
+                          }
                           onMouseLeave={() => setHoveredPoi(null)}
                           whileHover={{ scale: 1.015 }}
                           whileTap={{ scale: 0.98 }}
@@ -286,11 +308,12 @@ function AnalysisPage() {
                           className={`
                             w-full text-left bg-white rounded-xl p-4 border transition-all duration-200
                             flex items-start gap-3 cursor-pointer group relative
-                            ${isSelected
-                              ? 'shadow-md'
-                              : isHovered
-                              ? 'shadow-md border-[#d4cec5]'
-                              : 'shadow-sm border-[#e8e2d4] hover:shadow-md hover:border-[#d4cec5]'
+                            ${
+                              isSelected
+                                ? "shadow-md"
+                                : isHovered
+                                  ? "shadow-md border-[#d4cec5]"
+                                  : "shadow-sm border-[#e8e2d4] hover:shadow-md hover:border-[#d4cec5]"
                             }
                           `}
                           style={
@@ -307,13 +330,11 @@ function AnalysisPage() {
                             <div
                               className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
                               style={{
-                                borderColor: isSelected ? meta.color : '#d4cec5',
-                                background: isSelected ? meta.color : 'transparent',
+                                borderColor: isSelected ? meta.color : "#d4cec5",
+                                background: isSelected ? meta.color : "transparent",
                               }}
                             >
-                              {isSelected && (
-                                <div className="w-2 h-2 rounded-full bg-white" />
-                              )}
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                             </div>
                           </div>
 
@@ -321,8 +342,8 @@ function AnalysisPage() {
                           <div
                             className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
                             style={{
-                              background: isSelected ? `${meta.color}20` : '#faf8f4',
-                              border: `1px solid ${isSelected ? meta.color + '40' : '#f0ebe0'}`,
+                              background: isSelected ? `${meta.color}20` : "#faf8f4",
+                              border: `1px solid ${isSelected ? meta.color + "40" : "#f0ebe0"}`,
                             }}
                           >
                             <Icon className="w-4 h-4" style={{ color: meta.color }} />
@@ -383,7 +404,7 @@ function MapView() {
     setHoveredPoi(null);
   }, [mapProvider, setHoveredPoi]);
 
-  if (mapProvider === 'mapbox') {
+  if (mapProvider === "mapbox") {
     return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} />;
   }
   return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
@@ -401,14 +422,17 @@ function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?
 }
 
 function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
-  const [mapTypeId, setMapTypeId] = useState<string>('roadmap');
+  const [mapTypeId, setMapTypeId] = useState<string>("roadmap");
   const [showLayers, setShowLayers] = useState(false);
   const selectedPois = useReportStore((s) => s.selectedPois);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
-  const mapRef = useRef<any>(null);
+  const activeMapStyleId = useReportStore((s) => s.activeMapStyleId);
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  const activeStyle = MAP_STYLES.find((s) => s.id === activeMapStyleId) || MAP_STYLES[0];
 
   const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: apiKey,
   });
 
@@ -422,12 +446,12 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
-    
+
     const activePois = [
       ...Object.values(selectedPois),
-      ...(hoveredPoi && !hoveredIsAlreadySelected ? [hoveredPoi] : [])
+      ...(hoveredPoi && !hoveredIsAlreadySelected ? [hoveredPoi] : []),
     ];
-    
+
     if (activePois.length === 0) {
       map.setCenter({ lat, lng });
       map.setZoom(15);
@@ -440,15 +464,27 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
       maxDeltaLat = Math.max(maxDeltaLat, Math.abs(p.lat - lat));
       maxDeltaLng = Math.max(maxDeltaLng, Math.abs(p.lng - lng));
     });
-    
+
     if (maxDeltaLat > 0 || maxDeltaLng > 0) {
       const PADDING_FACTOR = 1.3;
       const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend({ lat: lat + maxDeltaLat * PADDING_FACTOR, lng: lng + maxDeltaLng * PADDING_FACTOR });
-      bounds.extend({ lat: lat - maxDeltaLat * PADDING_FACTOR, lng: lng - maxDeltaLng * PADDING_FACTOR });
+      bounds.extend({
+        lat: lat + maxDeltaLat * PADDING_FACTOR,
+        lng: lng + maxDeltaLng * PADDING_FACTOR,
+      });
+      bounds.extend({
+        lat: lat - maxDeltaLat * PADDING_FACTOR,
+        lng: lng - maxDeltaLng * PADDING_FACTOR,
+      });
       map.fitBounds(bounds);
     }
   }, [lat, lng, selectedPois, hoveredPoi, hoveredIsAlreadySelected]);
+
+  useEffect(() => {
+    if (mapRef.current) {
+      mapRef.current.setOptions({ styles: activeStyle.styles });
+    }
+  }, [activeStyle]);
 
   if (!isLoaded) {
     return <div className="w-full h-full bg-[var(--cream)]" />;
@@ -457,28 +493,36 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
   return (
     <div className="relative w-full h-full">
       <GoogleMap
-        onLoad={(map) => { mapRef.current = map; }}
-        mapContainerStyle={{ width: '100%', height: '100%' }}
+        onLoad={(map) => {
+          mapRef.current = map;
+        }}
+        mapContainerStyle={{ width: "100%", height: "100%" }}
         center={{ lat, lng }}
         zoom={15}
         mapTypeId={mapTypeId}
         options={{
           disableDefaultUI: true,
           zoomControl: true,
-          styles: mapTypeId === 'roadmap' || mapTypeId === 'terrain' ? ROAD_FOCUS_STYLES : undefined
+          styles: activeStyle.styles,
         }}
       >
         {/* Site pin (red) */}
         <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
           <div
             style={{
-              transform: 'translate(-50%, -100%)',
+              transform: "translate(-50%, -100%)",
               zIndex: 700,
-              position: 'relative',
+              position: "relative",
             }}
             className="pointer-events-none"
           >
-            <svg width="35" height="46" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg
+              width="35"
+              height="46"
+              viewBox="0 0 34 44"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
               <path
                 d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
                 fill="#E53935"
@@ -493,7 +537,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
 
         {/* Selected POI markers — circular icon badges */}
         {poisToShow.map((poi) => {
-          const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
+          const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
           const Icon = meta.Icon;
           const isThisHovered = hoveredPoi?.id === poi.id;
           const size = 30;
@@ -506,44 +550,46 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
             >
               <div
                 style={{
-                  transform: 'translate(-50%, -50%)',
+                  transform: "translate(-50%, -50%)",
                   zIndex: isThisHovered ? 900 : 600,
-                  position: 'relative',
-                  pointerEvents: 'none',
+                  position: "relative",
+                  pointerEvents: "none",
                 }}
               >
                 {/* Hover tooltip */}
                 {isThisHovered && (
                   <div
                     style={{
-                      position: 'absolute',
+                      position: "absolute",
                       bottom: `${size / 2 + 10}px`,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      whiteSpace: 'nowrap',
-                      background: '#0f1e35',
-                      color: 'white',
-                      fontSize: '11px',
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      whiteSpace: "nowrap",
+                      background: "#0f1e35",
+                      color: "white",
+                      fontSize: "11px",
                       fontWeight: 600,
-                      padding: '6px 10px',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                      padding: "6px 10px",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
                       zIndex: 1000,
-                      pointerEvents: 'none',
+                      pointerEvents: "none",
                     }}
                   >
                     {poi.name}
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '5px solid transparent',
-                      borderRight: '5px solid transparent',
-                      borderTop: '5px solid #0f1e35',
-                    }} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: 0,
+                        height: 0,
+                        borderLeft: "5px solid transparent",
+                        borderRight: "5px solid transparent",
+                        borderTop: "5px solid #0f1e35",
+                      }}
+                    />
                   </div>
                 )}
 
@@ -552,111 +598,17 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                   style={{
                     width: size,
                     height: size,
-                    borderRadius: '50%',
+                    borderRadius: "50%",
                     background: meta.color,
-                    border: '3px solid white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    border: "3px solid white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     boxShadow: isThisHovered
                       ? `0 6px 20px ${meta.color}70, 0 0 0 3px ${meta.color}30`
                       : `0 2px 10px rgba(0,0,0,0.28)`,
-                    transition: 'all 0.2s ease',
-                    position: 'relative',
-                    zIndex: 1,
-                  }}
-                >
-                  <Icon
-                    size={14}
-                    color="white"
-                    strokeWidth={2.5}
-                  />
-                </div>
-              </div>
-            </OverlayView>
-          );
-        })}
-
-        {/* Hovered POI preview marker (semi-transparent, temporary) */}
-        {hoveredPoi && !hoveredIsAlreadySelected && (() => {
-          const meta = CATEGORY_META[hoveredPoi.type] ?? { Icon: MapPin, color: '#666' };
-          const Icon = meta.Icon;
-          return (
-            <OverlayView
-              position={{ lat: hoveredPoi.lat, lng: hoveredPoi.lng }}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-            >
-              <div
-                style={{
-                  transform: 'translate(-50%, -50%)',
-                  zIndex: 850,
-                  position: 'relative',
-                  pointerEvents: 'none',
-                }}
-              >
-                {/* Tooltip */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: '33px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    whiteSpace: 'nowrap',
-                    background: '#0f1e35',
-                    color: 'white',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '6px 10px',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
-                    zIndex: 1000,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  {hoveredPoi.name}
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 0,
-                    height: 0,
-                    borderLeft: '5px solid transparent',
-                    borderRight: '5px solid transparent',
-                    borderTop: '5px solid #0f1e35',
-                  }} />
-                </div>
-
-                {/* Semi-transparent pulse ring */}
-                <div
-                  className="animate-ping"
-                  style={{
-                    position: 'absolute',
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: meta.color,
-                    opacity: 0.2,
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                />
-
-                {/* Preview circle badge (semi-transparent) */}
-                <div
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: '50%',
-                    background: meta.color,
-                    border: '2px solid white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: `0 4px 16px ${meta.color}50`,
-                    opacity: 0.65,
-                    position: 'relative',
+                    transition: "all 0.2s ease",
+                    position: "relative",
                     zIndex: 1,
                   }}
                 >
@@ -665,7 +617,101 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
               </div>
             </OverlayView>
           );
-        })()}
+        })}
+
+        {/* Hovered POI preview marker (semi-transparent, temporary) */}
+        {hoveredPoi &&
+          !hoveredIsAlreadySelected &&
+          (() => {
+            const meta = CATEGORY_META[hoveredPoi.type] ?? { Icon: MapPin, color: "#666" };
+            const Icon = meta.Icon;
+            return (
+              <OverlayView
+                position={{ lat: hoveredPoi.lat, lng: hoveredPoi.lng }}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              >
+                <div
+                  style={{
+                    transform: "translate(-50%, -50%)",
+                    zIndex: 850,
+                    position: "relative",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {/* Tooltip */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "33px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      whiteSpace: "nowrap",
+                      background: "#0f1e35",
+                      color: "white",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "6px 10px",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+                      zIndex: 1000,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {hoveredPoi.name}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: 0,
+                        height: 0,
+                        borderLeft: "5px solid transparent",
+                        borderRight: "5px solid transparent",
+                        borderTop: "5px solid #0f1e35",
+                      }}
+                    />
+                  </div>
+
+                  {/* Semi-transparent pulse ring */}
+                  <div
+                    className="animate-ping"
+                    style={{
+                      position: "absolute",
+                      width: 36,
+                      height: 36,
+                      borderRadius: "50%",
+                      background: meta.color,
+                      opacity: 0.2,
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  />
+
+                  {/* Preview circle badge (semi-transparent) */}
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "50%",
+                      background: meta.color,
+                      border: "2px solid white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: `0 4px 16px ${meta.color}50`,
+                      opacity: 0.65,
+                      position: "relative",
+                      zIndex: 1,
+                    }}
+                  >
+                    <Icon size={14} color="white" strokeWidth={2.5} />
+                  </div>
+                </div>
+              </OverlayView>
+            );
+          })()}
       </GoogleMap>
 
       {/* Layer Selector */}
@@ -678,14 +724,16 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
         <button
           className="relative w-[60px] h-[60px] rounded-xl shadow-lg border-[2px] border-white overflow-hidden transition-transform hover:scale-105"
           style={{
-            background: mapTypeId === 'satellite' || mapTypeId === 'hybrid' ? '#2d3748' : '#e8e2d4',
+            background: mapTypeId === "satellite" || mapTypeId === "hybrid" ? "#2d3748" : "#e8e2d4",
           }}
           onClick={() => setShowLayers(!showLayers)}
         >
           <div className="absolute inset-0 bg-black/30" />
           <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
             <Layers className="w-5 h-5 text-white drop-shadow-md mb-0.5" />
-            <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">Layers</span>
+            <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">
+              Layers
+            </span>
           </div>
         </button>
 
@@ -699,7 +747,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
               transition={{ duration: 0.2 }}
               className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-2 flex gap-1 mb-1"
             >
-              {(['roadmap', 'satellite', 'hybrid', 'terrain'] as const).map(type => {
+              {(["roadmap", "satellite", "hybrid", "terrain"] as const).map((type) => {
                 const isActive = mapTypeId === type;
                 return (
                   <button
@@ -707,18 +755,32 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                     onClick={() => setMapTypeId(type)}
                     className="flex flex-col items-center gap-1.5 w-16 group p-1"
                   >
-                    <div className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 ${isActive ? 'border-blue-500 scale-95 shadow-inner' : 'border-transparent group-hover:border-gray-300 group-hover:shadow'
+                    <div
+                      className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 ${
+                        isActive
+                          ? "border-blue-500 scale-95 shadow-inner"
+                          : "border-transparent group-hover:border-gray-300 group-hover:shadow"
                       } overflow-hidden relative flex items-center justify-center`}
-                      style={{ background: type === 'satellite' || type === 'hybrid' ? '#2d3748' : '#e8e2d4' }}
+                      style={{
+                        background:
+                          type === "satellite" || type === "hybrid" ? "#2d3748" : "#e8e2d4",
+                      }}
                     >
-                      <Layers className={`w-5 h-5 opacity-50 ${type === 'satellite' || type === 'hybrid' ? 'text-white' : 'text-gray-600'}`} />
+                      <Layers
+                        className={`w-5 h-5 opacity-50 ${type === "satellite" || type === "hybrid" ? "text-white" : "text-gray-600"}`}
+                      />
                     </div>
-                    <span className={`text-[11px] capitalize transition-colors ${isActive ? 'font-bold text-blue-600' : 'font-medium text-gray-500 group-hover:text-gray-800'
-                      }`}>
+                    <span
+                      className={`text-[11px] capitalize transition-colors ${
+                        isActive
+                          ? "font-bold text-blue-600"
+                          : "font-medium text-gray-500 group-hover:text-gray-800"
+                      }`}
+                    >
                       {type}
                     </span>
                   </button>
-                )
+                );
               })}
             </motion.div>
           )}
@@ -730,14 +792,44 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
 
 // Premium cinematic style palette — luxury real-estate brochure aesthetic
 const MAPBOX_STYLES = [
-  { id: 'custom',               label: 'Custom',            url: 'mapbox://styles/sharath-io/cmppx0gjn001b01s7h87a1n21', dark: true,  accent: '#c8b97e' },
-  { id: 'dark-v11',             label: 'Monochrome',        url: 'mapbox://styles/mapbox/dark-v11',             dark: true,  accent: '#c8b97e' },
-  { id: 'light-v11',            label: 'Ivory',             url: 'mapbox://styles/mapbox/light-v11',            dark: false, accent: '#8a7a5c' },
-  { id: 'satellite-v9',         label: 'Satellite',         url: 'mapbox://styles/mapbox/satellite-v9',         dark: true,  accent: '#6ec6e0' },
-  { id: 'outdoors-v12',         label: 'Terrain',           url: 'mapbox://styles/mapbox/outdoors-v12',         dark: false, accent: '#7aa89b' },
+  {
+    id: "custom",
+    label: "Custom",
+    url: "mapbox://styles/sharath-io/cmppx0gjn001b01s7h87a1n21",
+    dark: true,
+    accent: "#c8b97e",
+  },
+  {
+    id: "dark-v11",
+    label: "Monochrome",
+    url: "mapbox://styles/mapbox/dark-v11",
+    dark: true,
+    accent: "#c8b97e",
+  },
+  {
+    id: "light-v11",
+    label: "Ivory",
+    url: "mapbox://styles/mapbox/light-v11",
+    dark: false,
+    accent: "#8a7a5c",
+  },
+  {
+    id: "satellite-v9",
+    label: "Satellite",
+    url: "mapbox://styles/mapbox/satellite-v9",
+    dark: true,
+    accent: "#6ec6e0",
+  },
+  {
+    id: "outdoors-v12",
+    label: "Terrain",
+    url: "mapbox://styles/mapbox/outdoors-v12",
+    dark: false,
+    accent: "#7aa89b",
+  },
 ] as const;
 
-type MapboxStyleId = typeof MAPBOX_STYLES[number]['id'];
+type MapboxStyleId = (typeof MAPBOX_STYLES)[number]["id"];
 
 // Flat 2D camera settings
 const CINEMATIC_PITCH = 0;
@@ -746,21 +838,21 @@ const CINEMATIC_ZOOM = 14;
 
 // Layer IDs to hide: business POIs, transit labels, dense icons
 const LAYERS_TO_HIDE = [
-  'poi-label',
-  'transit-label',
-  'road-label',
-  'airport-label',
-  'settlement-minor-label',
-  'natural-point-label',
+  "poi-label",
+  "transit-label",
+  "road-label",
+  "airport-label",
+  "settlement-minor-label",
+  "natural-point-label",
 ];
 
 // Layers to reduce opacity (subtle, not hidden)
 const ROAD_LAYERS_TO_MUTE = [
-  'road-minor',
-  'road-minor-case',
-  'road-service',
-  'road-service-case',
-  'road-path',
+  "road-minor",
+  "road-minor-case",
+  "road-service",
+  "road-service-case",
+  "road-path",
 ];
 
 // Apply cinematic layer overrides after style loads
@@ -770,22 +862,34 @@ function applyCinematicLayerOverrides(map: mapboxgl.Map, isDark: boolean) {
   // Hide noisy POI / transit / dense label layers
   for (const layerId of LAYERS_TO_HIDE) {
     if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, 'visibility', 'none');
+      map.setLayoutProperty(layerId, "visibility", "none");
     }
   }
 
   // Keep locality/city/major road/water labels — selectively re-enable
-  const keepVisible = ['country-label', 'state-label', 'settlement-major-label', 'settlement-subdivision-label', 'waterway-label', 'water-line-label', 'water-point-label'];
+  const keepVisible = [
+    "country-label",
+    "state-label",
+    "settlement-major-label",
+    "settlement-subdivision-label",
+    "waterway-label",
+    "water-line-label",
+    "water-point-label",
+  ];
   for (const layerId of keepVisible) {
     if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, 'visibility', 'visible');
+      map.setLayoutProperty(layerId, "visibility", "visible");
     }
   }
 
   // Mute minor road layers (reduce opacity)
   for (const layerId of ROAD_LAYERS_TO_MUTE) {
     if (map.getLayer(layerId)) {
-      try { map.setPaintProperty(layerId, 'line-opacity', 0.25); } catch { /* not a line layer */ }
+      try {
+        map.setPaintProperty(layerId, "line-opacity", 0.25);
+      } catch {
+        /* not a line layer */
+      }
     }
   }
 
@@ -793,25 +897,29 @@ function applyCinematicLayerOverrides(map: mapboxgl.Map, isDark: boolean) {
 
   // Tune water color for premium aesthetic
   for (const layer of allLayers) {
-    if (layer.id.startsWith('water') && layer.type === 'fill') {
+    if (layer.id.startsWith("water") && layer.type === "fill") {
       try {
-        map.setPaintProperty(layer.id, 'fill-color', isDark ? '#1a2b3c' : '#c9d8e8');
-      } catch { /* skip */ }
+        map.setPaintProperty(layer.id, "fill-color", isDark ? "#1a2b3c" : "#c9d8e8");
+      } catch {
+        /* skip */
+      }
     }
   }
 }
 
 // ── Helper: build a POI marker DOM element ────────────────────────────────
 function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } = {}) {
-  const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: '#666' };
-  let iconSvgStr = '';
+  const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+  let iconSvgStr = "";
   try {
     iconSvgStr = renderToStaticMarkup(
-      createElement(meta.Icon, { size: 14, color: 'white', strokeWidth: 2.5 } as never)
+      createElement(meta.Icon, { size: 14, color: "white", strokeWidth: 2.5 } as never),
     );
-  } catch { /* fallback to empty */ }
+  } catch {
+    /* fallback to empty */
+  }
 
-  const el = document.createElement('div');
+  const el = document.createElement("div");
   const opacity = options.opacity ?? 1;
   el.style.cssText = `
     width: 30px;
@@ -822,7 +930,7 @@ function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } 
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: ${opacity < 1 ? `0 4px 16px ${meta.color}50` : '0 2px 8px rgba(0,0,0,0.28)'};
+    box-shadow: ${opacity < 1 ? `0 4px 16px ${meta.color}50` : "0 2px 8px rgba(0,0,0,0.28)"};
     opacity: ${opacity};
     cursor: pointer;
     transition: all 0.2s ease;
@@ -831,11 +939,15 @@ function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } 
   return { el, meta };
 }
 
+interface CustomMarker extends mapboxgl.Marker {
+  __poiId?: string;
+}
+
 function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
-  const [activeStyle, setActiveStyle] = useState<MapboxStyleId>('custom');
+  const markersRef = useRef<Map<string, CustomMarker>>(new Map());
+  const [activeStyle, setActiveStyle] = useState<MapboxStyleId>("custom");
   const [showLayers, setShowLayers] = useState(false);
   // Skip the changeStyle effect on first render — the map is already initialized
   // with activeStyle, so calling setStyle() again would fire a duplicate style.load
@@ -848,14 +960,16 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
   // Fix 4: useLayoutEffect keeps the ref synchronously up-to-date before any
   // async map event callbacks read it, preventing stale-closure bugs.
   const selectedPoisRef = useRef(selectedPois);
-  useLayoutEffect(() => { selectedPoisRef.current = selectedPois; }, [selectedPois]);
+  useLayoutEffect(() => {
+    selectedPoisRef.current = selectedPois;
+  }, [selectedPois]);
 
   // ── Shared: add all selected POI markers to map (clears existing first) ──
   const syncSelectedMarkersToMap = useCallback((map: mapboxgl.Map, pois: typeof selectedPois) => {
     // Remove any existing POI markers from the DOM, then clear the ref.
     // (When called after a style change the DOM markers are already gone,
     //  but when called from incremental sync they need explicit removal.)
-    markersRef.current.forEach(m => m.remove());
+    markersRef.current.forEach((m) => m.remove());
     markersRef.current.clear();
 
     for (const [categoryType, poi] of Object.entries(pois)) {
@@ -865,19 +979,22 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         offset: 24,
         closeButton: false,
         closeOnClick: false,
-        className: 'poi-popup',
+        className: "poi-popup",
       }).setHTML(`<span>${poi.name}</span>`);
 
-      el.addEventListener('mouseenter', () => marker.getPopup()?.isOpen() === false && marker.togglePopup());
-      el.addEventListener('mouseleave', () => marker.getPopup()?.isOpen() && marker.togglePopup());
+      el.addEventListener(
+        "mouseenter",
+        () => marker.getPopup()?.isOpen() === false && marker.togglePopup(),
+      );
+      el.addEventListener("mouseleave", () => marker.getPopup()?.isOpen() && marker.togglePopup());
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([poi.lng, poi.lat])
         .setPopup(popup)
         .addTo(map);
 
-      (marker as any).__poiId = poi.id;
-      markersRef.current.set(categoryType, marker);
+      (marker as CustomMarker).__poiId = poi.id;
+      markersRef.current.set(categoryType, marker as CustomMarker);
     }
   }, []);
 
@@ -885,7 +1002,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
   useEffect(() => {
     if (!token || !containerRef.current) return;
     mapboxgl.accessToken = token;
-    const styleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle) ?? MAPBOX_STYLES[0];
+    const styleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: styleMeta.url,
@@ -899,7 +1016,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
 
     // Custom elegant site pin (gold ring + dot)
     const addSitePin = () => {
-      const el = document.createElement('div');
+      const el = document.createElement("div");
       el.style.cssText = `
         width: 38px;
         height: 38px;
@@ -914,23 +1031,27 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
           <circle cx="19" cy="18" r="2.5" fill="#c8b97e"/>
         </svg>
       `;
-      new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
+      new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([lng, lat]).addTo(map);
     };
 
     // Fix 1: Read the store directly inside the load callback to guarantee we
     // have the latest snapshot — not through a ref that may be stale.
     const hydrateMarkers = () => {
       const latestPois = useReportStore.getState().selectedPois;
-      const currentStyleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle) ?? MAPBOX_STYLES[0];
+      const currentStyleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
       // Explicitly remove any existing DOM markers before clearing the ref.
       // (Mapbox removes GL layers on setStyle but DOM markers survive — we must
       // clean them up ourselves to prevent orphans.)
-      markersRef.current.forEach(m => m.remove());
+      markersRef.current.forEach((m) => m.remove());
       markersRef.current.clear();
       addSitePin();
       syncSelectedMarkersToMap(map, latestPois);
       // Apply cinematic layer overrides after every style.load
-      try { applyCinematicLayerOverrides(map, currentStyleMeta.dark); } catch { /* ignore if layers not ready */ }
+      try {
+        applyCinematicLayerOverrides(map, currentStyleMeta.dark);
+      } catch {
+        /* ignore if layers not ready */
+      }
     };
 
     // 'style.load' fires exactly once on initial map load AND once after every
@@ -938,9 +1059,12 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     // prevents hydrateMarkers from running twice on mount, which was causing
     // duplicate markers on the map even though the store holds only one POI
     // per category.
-    map.on('style.load', hydrateMarkers);
+    map.on("style.load", hydrateMarkers);
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, token]);
 
@@ -952,9 +1076,9 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       isFirstStyleRender.current = false;
       return;
     }
-    const style = MAPBOX_STYLES.find(s => s.id === activeStyle);
+    const style = MAPBOX_STYLES.find((s) => s.id === activeStyle);
     if (style && mapRef.current) {
-      markersRef.current.forEach(m => m.remove());
+      markersRef.current.forEach((m) => m.remove());
       markersRef.current.clear();
       mapRef.current.setStyle(style.url);
       // Restore cinematic camera after style switch
@@ -985,7 +1109,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     for (const [categoryType, poi] of Object.entries(selectedPois)) {
       const existing = markersRef.current.get(categoryType);
       // If marker exists but for a different POI (user re-selected within category), remove old
-      if (existing && (existing as any).__poiId !== poi.id) {
+      if (existing && existing.__poiId !== poi.id) {
         existing.remove();
         markersRef.current.delete(categoryType);
       }
@@ -997,19 +1121,25 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
           offset: 24,
           closeButton: false,
           closeOnClick: false,
-          className: 'poi-popup',
+          className: "poi-popup",
         }).setHTML(`<span>${poi.name}</span>`);
 
-        el.addEventListener('mouseenter', () => marker.getPopup()?.isOpen() === false && marker.togglePopup());
-        el.addEventListener('mouseleave', () => marker.getPopup()?.isOpen() && marker.togglePopup());
+        el.addEventListener(
+          "mouseenter",
+          () => marker.getPopup()?.isOpen() === false && marker.togglePopup(),
+        );
+        el.addEventListener(
+          "mouseleave",
+          () => marker.getPopup()?.isOpen() && marker.togglePopup(),
+        );
 
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
           .setLngLat([poi.lng, poi.lat])
           .setPopup(popup)
           .addTo(map);
 
-        (marker as any).__poiId = poi.id;
-        markersRef.current.set(categoryType, marker);
+        (marker as CustomMarker).__poiId = poi.id;
+        markersRef.current.set(categoryType, marker as CustomMarker);
       }
     }
   }, [selectedPois]);
@@ -1037,10 +1167,10 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       offset: 28,
       closeButton: false,
       closeOnClick: false,
-      className: 'poi-popup',
+      className: "poi-popup",
     }).setHTML(`<span>${hoveredPoi.name}</span>`);
 
-    const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+    const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
       .setLngLat([hoveredPoi.lng, hoveredPoi.lat])
       .setPopup(popup)
       .addTo(map);
@@ -1058,34 +1188,34 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
-    
-    const activePois = [
-      ...Object.values(selectedPois),
-      ...(hoveredPoi ? [hoveredPoi] : [])
-    ];
-    
+
+    const activePois = [...Object.values(selectedPois), ...(hoveredPoi ? [hoveredPoi] : [])];
+
     if (activePois.length === 0) {
-      map.easeTo({ center: [lng, lat], zoom: CINEMATIC_ZOOM, pitch: CINEMATIC_PITCH, bearing: CINEMATIC_BEARING, duration: 900 });
+      map.easeTo({
+        center: [lng, lat],
+        zoom: CINEMATIC_ZOOM,
+        pitch: CINEMATIC_PITCH,
+        bearing: CINEMATIC_BEARING,
+        duration: 900,
+      });
       return;
     }
-    
+
     let maxDeltaLat = 0;
     let maxDeltaLng = 0;
     activePois.forEach((p) => {
       maxDeltaLat = Math.max(maxDeltaLat, Math.abs(p.lat - lat));
       maxDeltaLng = Math.max(maxDeltaLng, Math.abs(p.lng - lng));
     });
-    
+
     if (maxDeltaLat > 0 || maxDeltaLng > 0) {
       const PADDING_FACTOR = 1.3;
       const dLat = maxDeltaLat * PADDING_FACTOR;
       const dLng = maxDeltaLng * PADDING_FACTOR;
-      
-      const bounds = new mapboxgl.LngLatBounds(
-        [lng - dLng, lat - dLat],
-        [lng + dLng, lat + dLat]
-      );
-      
+
+      const bounds = new mapboxgl.LngLatBounds([lng - dLng, lat - dLat], [lng + dLng, lat + dLat]);
+
       map.fitBounds(bounds, {
         padding: 50,
         maxZoom: 14,
@@ -1104,15 +1234,15 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     );
   }
 
-  const currentStyleMeta = MAPBOX_STYLES.find(s => s.id === activeStyle) ?? MAPBOX_STYLES[0];
+  const currentStyleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
 
   // Swatch background colors for the layer picker
   const swatchBg: Record<MapboxStyleId, string> = {
-    'custom':      'linear-gradient(135deg, #1c2235 0%, #2e3a55 100%)',
-    'dark-v11':    'linear-gradient(135deg, #1a1f2e 0%, #2d3450 100%)',
-    'light-v11':   'linear-gradient(135deg, #f5ede0 0%, #e8dcc8 100%)',
-    'satellite-v9':'linear-gradient(135deg, #1d3a2f 0%, #2a5240 100%)',
-    'outdoors-v12':'linear-gradient(135deg, #d4e8c4 0%, #a8c890 100%)',
+    custom: "linear-gradient(135deg, #1c2235 0%, #2e3a55 100%)",
+    "dark-v11": "linear-gradient(135deg, #1a1f2e 0%, #2d3450 100%)",
+    "light-v11": "linear-gradient(135deg, #f5ede0 0%, #e8dcc8 100%)",
+    "satellite-v9": "linear-gradient(135deg, #1d3a2f 0%, #2a5240 100%)",
+    "outdoors-v12": "linear-gradient(135deg, #d4e8c4 0%, #a8c890 100%)",
   };
 
   return (
@@ -1129,7 +1259,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         <button
           className="relative w-[56px] h-[56px] rounded-xl shadow-lg overflow-hidden transition-all duration-200 hover:scale-105 hover:shadow-xl"
           style={{
-            background: swatchBg[activeStyle] ?? '#1a1f2e',
+            background: swatchBg[activeStyle] ?? "#1a1f2e",
             border: `2px solid ${currentStyleMeta.accent}55`,
           }}
           onClick={() => setShowLayers(!showLayers)}
@@ -1137,7 +1267,9 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
           <div className="absolute inset-0 bg-black/20" />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
             <Layers className="w-4 h-4 text-white drop-shadow" />
-            <span className="text-[9px] font-semibold text-white/90 tracking-widest uppercase">Style</span>
+            <span className="text-[9px] font-semibold text-white/90 tracking-widest uppercase">
+              Style
+            </span>
           </div>
         </button>
 
@@ -1150,9 +1282,13 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
               exit={{ opacity: 0, x: -8, scale: 0.96 }}
               transition={{ duration: 0.18 }}
               className="flex gap-2 mb-1 p-2.5 rounded-2xl shadow-2xl border"
-              style={{ background: 'rgba(12,16,26,0.88)', backdropFilter: 'blur(16px)', borderColor: 'rgba(200,185,126,0.2)' }}
+              style={{
+                background: "rgba(12,16,26,0.88)",
+                backdropFilter: "blur(16px)",
+                borderColor: "rgba(200,185,126,0.2)",
+              }}
             >
-              {MAPBOX_STYLES.map(style => {
+              {MAPBOX_STYLES.map((style) => {
                 const isActive = activeStyle === style.id;
                 return (
                   <button
@@ -1164,17 +1300,29 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
                     <div
                       className="w-14 h-12 rounded-lg transition-all duration-250 overflow-hidden relative"
                       style={{
-                        background: swatchBg[style.id as MapboxStyleId] ?? '#1a1f2e',
-                        border: isActive ? `2px solid ${style.accent}` : '2px solid rgba(255,255,255,0.1)',
-                        boxShadow: isActive ? `0 0 0 1px ${style.accent}55, 0 4px 16px rgba(0,0,0,0.5)` : 'none',
-                        transform: isActive ? 'scale(0.95)' : 'scale(1)',
+                        background: swatchBg[style.id as MapboxStyleId] ?? "#1a1f2e",
+                        border: isActive
+                          ? `2px solid ${style.accent}`
+                          : "2px solid rgba(255,255,255,0.1)",
+                        boxShadow: isActive
+                          ? `0 0 0 1px ${style.accent}55, 0 4px 16px rgba(0,0,0,0.5)`
+                          : "none",
+                        transform: isActive ? "scale(0.95)" : "scale(1)",
                       }}
                     >
                       {/* Mini map preview lines */}
-                      <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.15) 6px, rgba(255,255,255,0.15) 7px)' }} />
+                      <div
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                          backgroundImage:
+                            "repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.15) 6px, rgba(255,255,255,0.15) 7px)",
+                        }}
+                      />
                     </div>
-                    <span className="text-[9px] tracking-wider uppercase font-medium transition-colors"
-                      style={{ color: isActive ? style.accent : 'rgba(255,255,255,0.5)' }}>
+                    <span
+                      className="text-[9px] tracking-wider uppercase font-medium transition-colors"
+                      style={{ color: isActive ? style.accent : "rgba(255,255,255,0.5)" }}
+                    >
                       {style.label}
                     </span>
                   </button>

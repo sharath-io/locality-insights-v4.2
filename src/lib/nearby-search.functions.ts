@@ -1,22 +1,22 @@
-import { createServerFn } from '@tanstack/react-start';
-import { z } from 'zod';
-import type { LocationReport, POIGroup, POIItem, BBox } from '@/types';
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import type { LocationReport, POIGroup, POIItem, BBox } from "@/types";
 
 const CATEGORY_TO_TYPE: Record<string, string> = {
-  HOSPITALS: 'hospital',
-  SCHOOLS: 'school',
-  COLLEGES: 'university',
-  'METRO/RAILWAY': 'subway_station',
-  'BUS STOPS': 'bus_station',
-  'IT PARKS': 'accounting',
-  'SHOPPING AREAS': 'shopping_mall',
-  TEMPLES: 'hindu_temple',
-  RESTAURANTS: 'restaurant',
-  'TOURIST ATTRACTIONS': 'tourist_attraction',
-  'LAKES/PARKS': 'park',
-  LANDMARKS: 'museum',
-  HIGHWAYS: 'gas_station',
-  'MAIN ROADS': 'transit_station',
+  HOSPITALS: "hospital",
+  SCHOOLS: "school",
+  COLLEGES: "university",
+  "METRO/RAILWAY": "subway_station",
+  "BUS STOPS": "bus_station",
+  "IT PARKS": "accounting",
+  "SHOPPING AREAS": "shopping_mall",
+  TEMPLES: "hindu_temple",
+  RESTAURANTS: "restaurant",
+  "TOURIST ATTRACTIONS": "tourist_attraction",
+  "LAKES/PARKS": "park",
+  LANDMARKS: "museum",
+  HIGHWAYS: "gas_station",
+  "MAIN ROADS": "transit_station",
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -25,9 +25,7 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
@@ -38,7 +36,7 @@ const inputSchema = z.object({
   radiusMeters: z.number().min(100).max(50000),
 });
 
-export const nearbySearch = createServerFn({ method: 'POST' })
+export const nearbySearch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }): Promise<LocationReport> => {
     const apiKey = process.env.GOOGLE_PLACES_KEY;
@@ -47,7 +45,7 @@ export const nearbySearch = createServerFn({ method: 'POST' })
     console.log("SERVER: Coordinates:", lat, lng);
     console.log("SERVER: Categories:", categories);
     console.log("SERVER: API Key defined:", !!apiKey);
-    if (!apiKey) throw new Error('GOOGLE_PLACES_KEY not configured');
+    if (!apiKey) throw new Error("GOOGLE_PLACES_KEY not configured");
 
     const groups: POIGroup[] = await Promise.all(
       categories.map(async (cat) => {
@@ -55,13 +53,12 @@ export const nearbySearch = createServerFn({ method: 'POST' })
         if (!mappedType) return { type: cat, items: [] as POIItem[] };
 
         try {
-          const res = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-            method: 'POST',
+          const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'X-Goog-Api-Key': apiKey,
-              'X-Goog-FieldMask':
-                'places.displayName,places.location,places.rating,places.types',
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": apiKey,
+              "X-Goog-FieldMask": "places.displayName,places.location,places.rating,places.types",
             },
             body: JSON.stringify({
               locationRestriction: {
@@ -95,7 +92,7 @@ export const nearbySearch = createServerFn({ method: 'POST' })
               const pLng = p.location!.longitude;
               const distanceKm = +haversineKm(lat, lng, pLat, pLng).toFixed(2);
               return {
-                name: p.displayName?.text ?? 'Unknown',
+                name: p.displayName?.text ?? "Unknown",
                 lat: pLat,
                 lng: pLng,
                 rating: p.rating,
@@ -105,7 +102,10 @@ export const nearbySearch = createServerFn({ method: 'POST' })
             });
 
           if (items.length === 0) {
-            console.log(`SERVER: 0 items for ${cat}. Response:`, JSON.stringify(json).slice(0, 500));
+            console.log(
+              `SERVER: 0 items for ${cat}. Response:`,
+              JSON.stringify(json).slice(0, 500),
+            );
           }
 
           return { type: cat, items };
@@ -113,7 +113,7 @@ export const nearbySearch = createServerFn({ method: 'POST' })
           console.error(`SERVER: Failed category ${cat}:`, err);
           return { type: cat, items: [] };
         }
-      })
+      }),
     );
 
     // Build bbox encompassing site + all POIs with 20% padding
@@ -142,16 +142,16 @@ export const nearbySearch = createServerFn({ method: 'POST' })
     console.log("SERVER: Total places found: ", totalPlaces);
 
     return {
-      site: { lat, lng, label: 'Site Location' },
+      site: { lat, lng, label: "Site Location" },
       pois: groups,
       bbox,
       reportId: crypto.randomUUID(),
     };
   });
 
-export const getMapKeys = createServerFn({ method: 'GET' }).handler(async () => {
+export const getMapKeys = createServerFn({ method: "GET" }).handler(async () => {
   return {
-    googleMapsKey: process.env.GOOGLE_MAPS_BROWSER_KEY ?? '',
-    mapboxToken: process.env.MAPBOX_TOKEN ?? '',
+    googleMapsKey: process.env.GOOGLE_MAPS_BROWSER_KEY ?? "",
+    mapboxToken: process.env.MAPBOX_TOKEN ?? "",
   };
 });

@@ -23,8 +23,12 @@
 body {
   font-family: var(--font-body);
 }
-.font-heading { font-family: var(--font-heading); }
-.font-body { font-family: var(--font-body); }
+.font-heading {
+  font-family: var(--font-heading);
+}
+.font-body {
+  font-family: var(--font-body);
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -176,11 +180,10 @@ body {
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   border: none;
 }
 
 .poi-popup .mapboxgl-popup-tip {
   border-top-color: #0f1e35;
 }
-
