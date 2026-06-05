@@ -2,25 +2,27 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   useMemo,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   useCallback,
   createElement,
 } from "react";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { motion, AnimatePresence } from "framer-motion";
 import { GoogleMap, OverlayView, useJsApiLoader } from "@react-google-maps/api";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ArrowLeft, MapPin, Layers } from "lucide-react";
+import { ArrowLeft, MapPin, Layers, Sparkles, Camera, Download, X, MapPinned, List } from "lucide-react";
+import { toPng } from "html-to-image";
 import { useReportStore } from "@/stores/reportStore";
 import type { SelectedPoiEntry } from "@/stores/reportStore";
 import { usePlacesSearch } from "@/hooks/usePlacesSearch";
 import { useMapKeys } from "@/hooks/useMapKeys";
-import { CATEGORY_META, ROAD_FOCUS_STYLES } from "@/lib/map-styles";
+import { CATEGORY_META } from "@/lib/map-styles";
 import { MapStyleSwitcher } from "@/components/MapStyleSwitcher";
 import { MAP_STYLES } from "@/styles/mapStyles";
+import { BrochureDialog } from "@/components/BrochureDialog";
 
 export const Route = createFileRoute("/analysis")({
   head: () => ({
@@ -51,11 +53,15 @@ function AnalysisPage() {
   const mapProvider = useReportStore((s) => s.mapProvider);
   const setMapProvider = useReportStore((s) => s.setMapProvider);
   const selectedPois = useReportStore((s) => s.selectedPois);
-  const selectPoi = useReportStore((s) => s.selectPoi);
-  const clearPoi = useReportStore((s) => s.clearPoi);
+  const togglePoi = useReportStore((s) => s.togglePoi);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
   const resetAnalysis = useReportStore((s) => s.resetAnalysis);
+  const [isBrochureOpen, setIsBrochureOpen] = useState(false);
+  const [isMapboxImageOpen, setIsMapboxImageOpen] = useState(false);
+  const [isMapboxImageTopRightOpen, setIsMapboxImageTopRightOpen] = useState(false);
+  const [isMapboxImageNoLabelsOpen, setIsMapboxImageNoLabelsOpen] = useState(false);
+  const keys = useMapKeys();
 
   usePlacesSearch();
 
@@ -95,23 +101,16 @@ function AnalysisPage() {
 
   const handleSelect = useCallback(
     (p: PoiRow) => {
-      const current = selectedPois[p.type];
-      if (current?.id === p.id) {
-        // Clicking the already-selected POI deselects it
-        clearPoi(p.type);
-      } else {
-        // Radio: replace previous selection in this category
-        selectPoi({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          lat: p.lat,
-          lng: p.lng,
-          distanceKm: p.distanceKm,
-        });
-      }
+      togglePoi({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        lat: p.lat,
+        lng: p.lng,
+        distanceKm: p.distanceKm,
+      });
     },
-    [selectedPois, selectPoi, clearPoi],
+    [togglePoi],
   );
 
   if (!coordinates) return null;
@@ -145,26 +144,27 @@ function AnalysisPage() {
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
           </div>
 
-          {/* Selected POIs legend */}
-          {Object.values(selectedPois).length > 0 && (
-            <div className="absolute top-4 right-4 flex flex-col gap-1.5 max-w-[200px]">
-              {Object.values(selectedPois).map((poi) => {
-                const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
-                const Icon = meta.Icon;
-                return (
-                  <div
-                    key={poi.id}
-                    className="flex items-center gap-2 bg-white/95 backdrop-blur px-2.5 py-1.5 rounded-lg shadow text-[11px]"
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
-                    <span className="text-[var(--navy)] font-medium truncate">
-                      {poi.name.split(",")[0]} - {poi.distanceKm.toFixed(1)} km
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Selected POIs List (Top Right) */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(48vh-80px)] overflow-y-auto pointer-events-none [&::-webkit-scrollbar]:hidden z-50">
+            {Object.values(selectedPois).flat().sort((a, b) => a.distanceKm - b.distanceKm).map((poi) => {
+              const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+              const Icon = meta.Icon;
+              return (
+                <div 
+                  key={poi.id} 
+                  className="flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow pointer-events-auto border border-[#e8e2d4]"
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
+                  <span className="text-[12px] font-medium text-[var(--navy)] max-w-[140px] truncate" title={poi.name}>
+                    {poi.name}
+                  </span>
+                  <span className="text-[11px] font-bold shrink-0" style={{ color: meta.color }}>
+                    {poi.distanceKm.toFixed(1)}km
+                  </span>
+                </div>
+              );
+            })}
+          </div>
 
           {/* Map provider switcher */}
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
@@ -198,11 +198,118 @@ function AnalysisPage() {
           )}
         </div>
 
-        {/* Style selection below map */}
-        <div className="mt-3 flex justify-end">
+        {/* Style selection + Brochure CTA below map */}
+        <div className="mt-3 flex items-center justify-between">
           <MapStyleSwitcher />
+          <div className="flex items-center gap-2">
+            {/* Capture Mapbox Image — only visible in Mapbox mode */}
+            {mapProvider === "mapbox" && (
+              <>
+                <button
+                  id="capture-mapbox-image-btn"
+                  onClick={() => setIsMapboxImageOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 border"
+                  style={{
+                    background: "linear-gradient(135deg, #c8b97e22 0%, #c8b97e11 100%)",
+                    borderColor: "#c8b97e55",
+                    color: "#8a7a5c",
+                    letterSpacing: "-0.01em",
+                  }}
+                  title="Capture current Mapbox view as a static image"
+                >
+                  <Camera className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  Capture Map Image
+                </button>
+                <button
+                  id="capture-labels-separately-btn"
+                  onClick={() => setIsMapboxImageTopRightOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 border"
+                  style={{
+                    background: "linear-gradient(135deg, #c8b97e22 0%, #c8b97e11 100%)",
+                    borderColor: "#c8b97e55",
+                    color: "#8a7a5c",
+                    letterSpacing: "-0.01em",
+                  }}
+                  title="Capture image with labels positioned on the top right"
+                >
+                  <List className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  Capture Labels Separately
+                </button>
+                <button
+                  id="capture-no-labels-btn"
+                  onClick={() => setIsMapboxImageNoLabelsOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 border"
+                  style={{
+                    background: "linear-gradient(135deg, #c8b97e22 0%, #c8b97e11 100%)",
+                    borderColor: "#c8b97e55",
+                    color: "#8a7a5c",
+                    letterSpacing: "-0.01em",
+                  }}
+                  title="Capture image with icons only — no text labels"
+                >
+                  <MapPin className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  Capture Without Text Labels
+                </button>
+              </>
+            )}
+            <button
+              id="generate-brochure-btn"
+              onClick={() => setIsBrochureOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
+              style={{
+                background: "linear-gradient(135deg, #0f1e35 0%, #1d3558 100%)",
+                boxShadow: "0 4px 20px rgba(15,30,53,0.3)",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              <Sparkles className="w-4 h-4" style={{ color: "#c8b97e" }} />
+              Generate Marketing Brochure
+            </button>
+          </div>
         </div>
       </section>
+
+      {/* Brochure Dialog */}
+      <BrochureDialog open={isBrochureOpen} onClose={() => setIsBrochureOpen(false)} />
+
+      {/* Mapbox Static Image Dialog */}
+      {isMapboxImageOpen && (
+        <MapboxImageDialog
+          open={isMapboxImageOpen}
+          onClose={() => setIsMapboxImageOpen(false)}
+          lat={coordinates.lat}
+          lng={coordinates.lng}
+          token={keys?.mapboxToken}
+          selectedPois={selectedPois}
+          labelsPosition="on-marker"
+        />
+      )}
+
+      {/* Mapbox Static Image Dialog (Top-Right Labels) */}
+      {isMapboxImageTopRightOpen && (
+        <MapboxImageDialog
+          open={isMapboxImageTopRightOpen}
+          onClose={() => setIsMapboxImageTopRightOpen(false)}
+          lat={coordinates.lat}
+          lng={coordinates.lng}
+          token={keys?.mapboxToken}
+          selectedPois={selectedPois}
+          labelsPosition="top-right"
+        />
+      )}
+
+      {/* Mapbox Static Image Dialog (No Labels) */}
+      {isMapboxImageNoLabelsOpen && (
+        <MapboxImageDialog
+          open={isMapboxImageNoLabelsOpen}
+          onClose={() => setIsMapboxImageNoLabelsOpen(false)}
+          lat={coordinates.lat}
+          lng={coordinates.lng}
+          token={keys?.mapboxToken}
+          selectedPois={selectedPois}
+          labelsPosition="none"
+        />
+      )}
 
       {/* ── PLACES LIST (directly below map) ── */}
       <section className="px-6 md:px-10 pt-10 max-w-7xl mx-auto">
@@ -214,7 +321,7 @@ function AnalysisPage() {
             Important Nearby Places
           </h2>
           <p className="text-[12px] text-[var(--muted)] mt-1">
-            Select one location per category to pin it on the map
+            Check any locations to pin them on the map — select multiple per category
           </p>
         </div>
 
@@ -250,7 +357,8 @@ function AnalysisPage() {
             {groupedPois.map(({ type, items }) => {
               const meta = CATEGORY_META[type] ?? { Icon: MapPin, color: "#666" };
               const Icon = meta.Icon;
-              const selectedInCategory = selectedPois[type];
+              const selectedInCategory = selectedPois[type] ?? [];
+              const pinnedCount = selectedInCategory.length;
 
               return (
                 <motion.div
@@ -270,12 +378,12 @@ function AnalysisPage() {
                     <h3 className="text-[14px] font-bold tracking-[0.12em] text-[var(--navy)] uppercase">
                       {type}
                     </h3>
-                    {selectedInCategory && (
+                    {pinnedCount > 0 && (
                       <span
                         className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: `${meta.color}18`, color: meta.color }}
                       >
-                        1 pinned
+                        {pinnedCount} pinned
                       </span>
                     )}
                     <div className="h-px flex-1 bg-gradient-to-r from-[#e8e2d4] to-transparent ml-2" />
@@ -284,24 +392,14 @@ function AnalysisPage() {
                   {/* Cards grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {items.map((p) => {
-                      const isSelected = selectedInCategory?.id === p.id;
+                      const isSelected = selectedInCategory.some((s) => s.id === p.id);
                       const isHovered = hoveredPoi?.id === p.id;
 
                       return (
                         <motion.button
                           key={p.id}
                           onClick={() => handleSelect(p)}
-                          onMouseEnter={() =>
-                            setHoveredPoi({
-                              id: p.id,
-                              name: p.name,
-                              type: p.type,
-                              lat: p.lat,
-                              lng: p.lng,
-                              distanceKm: p.distanceKm,
-                            })
-                          }
-                          onMouseLeave={() => setHoveredPoi(null)}
+
                           whileHover={{ scale: 1.015 }}
                           whileTap={{ scale: 0.98 }}
                           transition={{ duration: 0.15 }}
@@ -325,16 +423,32 @@ function AnalysisPage() {
                               : {}
                           }
                         >
-                          {/* Radio indicator */}
+                          {/* Checkbox indicator */}
                           <div className="shrink-0 mt-0.5 flex items-center justify-center">
                             <div
-                              className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
+                              className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200"
                               style={{
                                 borderColor: isSelected ? meta.color : "#d4cec5",
                                 background: isSelected ? meta.color : "transparent",
                               }}
                             >
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                              {isSelected && (
+                                <svg
+                                  width="11"
+                                  height="8"
+                                  viewBox="0 0 11 8"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M1 3.5L4 6.5L10 1"
+                                    stroke="white"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
                             </div>
                           </div>
 
@@ -436,7 +550,8 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
     googleMapsApiKey: apiKey,
   });
 
-  const poisToShow = Object.values(selectedPois);
+  // Flatten multi-select arrays to a single list for map rendering
+  const poisToShow = useMemo(() => Object.values(selectedPois).flat(), [selectedPois]);
   // Show hovered POI as preview if it's not already checked/selected
   const hoveredIsAlreadySelected = hoveredPoi
     ? poisToShow.some((p) => p.id === hoveredPoi.id)
@@ -448,7 +563,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
     const map = mapRef.current;
 
     const activePois = [
-      ...Object.values(selectedPois),
+      ...poisToShow,
       ...(hoveredPoi && !hoveredIsAlreadySelected ? [hoveredPoi] : []),
     ];
 
@@ -550,6 +665,8 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
             >
               <div
                 style={{
+                  width: size,
+                  height: size,
                   transform: "translate(-50%, -50%)",
                   zIndex: isThisHovered ? 900 : 600,
                   position: "relative",
@@ -608,7 +725,9 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
                       ? `0 6px 20px ${meta.color}70, 0 0 0 3px ${meta.color}30`
                       : `0 2px 10px rgba(0,0,0,0.28)`,
                     transition: "all 0.2s ease",
-                    position: "relative",
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
                     zIndex: 1,
                   }}
                 >
@@ -795,7 +914,7 @@ const MAPBOX_STYLES = [
   {
     id: "custom",
     label: "Custom",
-    url: "mapbox://styles/sharath-io/cmppx0gjn001b01s7h87a1n21",
+    url: "mapbox://styles/sharath-io/cmq02f0dc000o01qw8c2edjor",
     dark: true,
     accent: "#c8b97e",
   },
@@ -924,18 +1043,26 @@ function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } 
   el.style.cssText = `
     width: 30px;
     height: 30px;
-    border-radius: 50%;
-    background-color: ${meta.color};
-    border: 2px solid white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: ${opacity < 1 ? `0 4px 16px ${meta.color}50` : "0 2px 8px rgba(0,0,0,0.28)"};
     opacity: ${opacity};
     cursor: pointer;
     transition: all 0.2s ease;
   `;
-  el.innerHTML = iconSvgStr;
+
+  el.innerHTML = `
+    <div style="
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: ${meta.color};
+      border: 2px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: ${opacity < 1 ? `0 4px 16px ${meta.color}50` : "0 2px 8px rgba(0,0,0,0.28)"};
+    ">
+      ${iconSvgStr}
+    </div>
+  `;
   return { el, meta };
 }
 
@@ -947,32 +1074,39 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, CustomMarker>>(new Map());
-  const [activeStyle, setActiveStyle] = useState<MapboxStyleId>("custom");
+  // Sync activeStyle to the global store so siblings (e.g., MapboxImageDialog) can read it
+  const activeStyle = useReportStore((s) => s.activeMapStyleId) as MapboxStyleId;
+  const setActiveStyleInStore = useReportStore((s) => s.setActiveMapStyleId);
+  const setActiveStyle = (id: MapboxStyleId) => setActiveStyleInStore(id);
   const [showLayers, setShowLayers] = useState(false);
   // Skip the changeStyle effect on first render — the map is already initialized
   // with activeStyle, so calling setStyle() again would fire a duplicate style.load
   // which creates an untracked orphan marker (the ghost-marker bug).
   const isFirstStyleRender = useRef(true);
 
-  const selectedPois = useReportStore((s) => s.selectedPois);
+  const selectedPoisRaw = useReportStore((s) => s.selectedPois);
+  // Flatten multi-select arrays to a single list for map markers
+  const selectedPoisById = useMemo(() => {
+    const flat: Record<string, import("@/stores/reportStore").SelectedPoiEntry> = {};
+    for (const arr of Object.values(selectedPoisRaw)) {
+      for (const poi of arr) {
+        flat[poi.id] = poi;
+      }
+    }
+    return flat;
+  }, [selectedPoisRaw]);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
   const hoveredMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  // Fix 4: useLayoutEffect keeps the ref synchronously up-to-date before any
-  // async map event callbacks read it, preventing stale-closure bugs.
-  const selectedPoisRef = useRef(selectedPois);
-  useLayoutEffect(() => {
-    selectedPoisRef.current = selectedPois;
-  }, [selectedPois]);
 
   // ── Shared: add all selected POI markers to map (clears existing first) ──
-  const syncSelectedMarkersToMap = useCallback((map: mapboxgl.Map, pois: typeof selectedPois) => {
+  const syncSelectedMarkersToMap = useCallback((map: mapboxgl.Map, pois: typeof selectedPoisById) => {
     // Remove any existing POI markers from the DOM, then clear the ref.
     // (When called after a style change the DOM markers are already gone,
     //  but when called from incremental sync they need explicit removal.)
     markersRef.current.forEach((m) => m.remove());
     markersRef.current.clear();
 
-    for (const [categoryType, poi] of Object.entries(pois)) {
+    for (const [poiId, poi] of Object.entries(pois)) {
       const { el } = createPoiMarkerEl(poi);
 
       const popup = new mapboxgl.Popup({
@@ -993,8 +1127,8 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         .setPopup(popup)
         .addTo(map);
 
-      (marker as CustomMarker).__poiId = poi.id;
-      markersRef.current.set(categoryType, marker as CustomMarker);
+      (marker as CustomMarker).__poiId = poiId;
+      markersRef.current.set(poiId, marker as CustomMarker);
     }
   }, []);
 
@@ -1019,16 +1153,16 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       const el = document.createElement("div");
       el.style.cssText = `
         width: 38px;
-        height: 38px;
+        height: 46px;
         cursor: pointer;
         filter: drop-shadow(0 4px 12px rgba(0,0,0,0.45));
       `;
       el.innerHTML = `
         <svg width="38" height="46" viewBox="0 0 38 46" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M19 2C10.16 2 3 9.16 3 18c0 12.5 15.2 25.8 15.4 26 .33.27.87.27 1.2 0C19.8 43.8 35 30.5 35 18 35 9.16 27.84 2 19 2Z"
-            fill="#c8b97e" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" stroke-linejoin="round"/>
+            fill="#e53935" stroke="rgba(255,255,255,0.9)" stroke-width="1.5" stroke-linejoin="round"/>
           <circle cx="19" cy="18" r="5" fill="rgba(255,255,255,0.95)"/>
-          <circle cx="19" cy="18" r="2.5" fill="#c8b97e"/>
+          <circle cx="19" cy="18" r="2.5" fill="#e53935"/>
         </svg>
       `;
       new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([lng, lat]).addTo(map);
@@ -1038,6 +1172,13 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     // have the latest snapshot — not through a ref that may be stale.
     const hydrateMarkers = () => {
       const latestPois = useReportStore.getState().selectedPois;
+      const flatPois: Record<string, import("@/stores/reportStore").SelectedPoiEntry> = {};
+      for (const arr of Object.values(latestPois)) {
+        for (const poi of arr) {
+          flatPois[poi.id] = poi;
+        }
+      }
+
       const currentStyleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
       // Explicitly remove any existing DOM markers before clearing the ref.
       // (Mapbox removes GL layers on setStyle but DOM markers survive — we must
@@ -1045,7 +1186,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       markersRef.current.forEach((m) => m.remove());
       markersRef.current.clear();
       addSitePin();
-      syncSelectedMarkersToMap(map, latestPois);
+      syncSelectedMarkersToMap(map, flatPois);
       // Apply cinematic layer overrides after every style.load
       try {
         applyCinematicLayerOverrides(map, currentStyleMeta.dark);
@@ -1094,7 +1235,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     if (!mapRef.current) return;
     if (!mapRef.current.isStyleLoaded()) return;
     const map = mapRef.current;
-    const currentIds = new Set(Object.keys(selectedPois));
+    const currentIds = new Set(Object.keys(selectedPoisById));
     const existingIds = new Set(markersRef.current.keys());
 
     // Remove markers no longer selected
@@ -1106,15 +1247,8 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     }
 
     // Add new markers / update changed ones
-    for (const [categoryType, poi] of Object.entries(selectedPois)) {
-      const existing = markersRef.current.get(categoryType);
-      // If marker exists but for a different POI (user re-selected within category), remove old
-      if (existing && existing.__poiId !== poi.id) {
-        existing.remove();
-        markersRef.current.delete(categoryType);
-      }
-
-      if (!markersRef.current.has(categoryType)) {
+    for (const [poiId, poi] of Object.entries(selectedPoisById)) {
+      if (!markersRef.current.has(poiId)) {
         const { el } = createPoiMarkerEl(poi);
 
         const popup = new mapboxgl.Popup({
@@ -1138,11 +1272,11 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
           .setPopup(popup)
           .addTo(map);
 
-        (marker as CustomMarker).__poiId = poi.id;
-        markersRef.current.set(categoryType, marker as CustomMarker);
+        (marker as CustomMarker).__poiId = poiId;
+        markersRef.current.set(poiId, marker as CustomMarker);
       }
     }
-  }, [selectedPois]);
+  }, [selectedPoisById]);
 
   // Sync hovered POI preview marker (temporary, semi-transparent)
   useEffect(() => {
@@ -1158,7 +1292,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
     if (!hoveredPoi) return;
 
     // Don't show preview if already selected/checked
-    const isAlreadySelected = Object.values(selectedPois).some((p) => p.id === hoveredPoi.id);
+    const isAlreadySelected = !!selectedPoisById[hoveredPoi.id];
     if (isAlreadySelected) return;
 
     const { el } = createPoiMarkerEl(hoveredPoi, { opacity: 0.65 });
@@ -1182,14 +1316,14 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       marker.remove();
       hoveredMarkerRef.current = null;
     };
-  }, [hoveredPoi, selectedPois]);
+  }, [hoveredPoi, selectedPoisById]);
 
   // Zoom to fit bounds while keeping center exactly at `lng, lat`
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    const activePois = [...Object.values(selectedPois), ...(hoveredPoi ? [hoveredPoi] : [])];
+    const activePois = [...Object.values(selectedPoisById), ...(hoveredPoi ? [hoveredPoi] : [])];
 
     if (activePois.length === 0) {
       map.easeTo({
@@ -1224,7 +1358,7 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         bearing: CINEMATIC_BEARING,
       });
     }
-  }, [lat, lng, selectedPois, hoveredPoi]);
+  }, [lat, lng, selectedPoisById, hoveredPoi]);
 
   if (!token) {
     return (
@@ -1333,5 +1467,409 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+// ── Mapbox Static Images API helper ──────────────────────────────────────────
+
+/**
+ * Maps each MAPBOX_STYLES id to the standard style id used for static rendering.
+ * The custom/cinematic styles render as nearly-black in the Static Images API
+ * (the style's dark base layers don't produce visible tiles at static resolution),
+ * so we substitute with the closest standard Mapbox style that is guaranteed to render.
+ */
+const STATIC_STYLE_MAP: Record<string, string> = {
+  custom: "sharath-io/cmq02f0dc000o01qw8c2edjor", // our custom mapbox style
+  "dark-v11": "mapbox/dark-v11",
+  "light-v11": "mapbox/light-v11",
+  "satellite-v9": "mapbox/satellite-streets-v12", // satellite with labels
+  "outdoors-v12": "mapbox/outdoors-v12",
+};
+
+function fitZoom(center: { lat: number; lng: number }, points: { lat: number; lng: number }[], widthPx: number, heightPx: number) {
+  if (points.length === 0) return 14;
+  let minLat = center.lat; let maxLat = center.lat;
+  let minLng = center.lng; let maxLng = center.lng;
+  for (const p of points) {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lng < minLng) minLng = p.lng;
+    if (p.lng > maxLng) maxLng = p.lng;
+  }
+  const latDiff = maxLat - minLat;
+  const lngDiff = maxLng - minLng;
+  if (latDiff === 0 && lngDiff === 0) return 14;
+  const latZoom = Math.log2((heightPx * 360) / (latDiff * 512));
+  const lngZoom = Math.log2((widthPx * 360) / (lngDiff * 512));
+  const zoom = Math.min(latZoom, lngZoom);
+  return Math.max(10, Math.min(15, +zoom.toFixed(2))) - 0.6;
+}
+
+function latLngToPixel(lat: number, lng: number, centerLat: number, centerLng: number, zoom: number, widthPx: number, heightPx: number) {
+  const TILE = 512;
+  const scale = TILE * Math.pow(2, zoom) / 360;
+  const mercLat = (lat: number) => {
+    const rad = (lat * Math.PI) / 180;
+    return (180 / Math.PI) * Math.log(Math.tan(Math.PI / 4 + rad / 2));
+  };
+  const cx = (centerLng + 180) * scale;
+  const cy = (180 - mercLat(centerLat)) * scale;
+  const px = (lng + 180) * scale;
+  const py = (180 - mercLat(lat)) * scale;
+  return {
+    x: widthPx / 2 + (px - cx),
+    y: heightPx / 2 + (py - cy),
+  };
+}
+
+function buildStaticMapUrl(opts: {
+  token: string;
+  lng: number;
+  lat: number;
+  activeStyleId: string;
+  selectedPois: Record<string, SelectedPoiEntry[]>;
+  width?: number;
+  height?: number;
+}): { url: string, zoom: number } {
+  const { token, lng, lat, activeStyleId, selectedPois, width = 1200, height = 700 } = opts;
+
+  const staticStyle = STATIC_STYLE_MAP[activeStyleId] ?? "mapbox/satellite-streets-v12";
+  const overlays: string[] = [];
+  overlays.push(`pin-l+e53935(${lng.toFixed(6)},${lat.toFixed(6)})`);
+
+  const poiList = Object.values(selectedPois).flat();
+  const zoom = fitZoom({ lat, lng }, poiList, width, height);
+
+  const overlayStr = overlays.join(",");
+
+  const url = `https://api.mapbox.com/styles/v1/${staticStyle}/static/` +
+    `${overlayStr}/` +
+    `${lng},${lat},${zoom},0/` +
+    `${width}x${height}@2x` +
+    `?access_token=${token}`;
+    
+  return { url, zoom };
+}
+
+
+// ── Mapbox Static Image Dialog ────────────────────────────────────────────────
+
+interface MapboxImageDialogProps {
+  open: boolean;
+  onClose: () => void;
+  lat: number;
+  lng: number;
+  token?: string;
+  selectedPois: Record<string, SelectedPoiEntry[]>;
+  labelsPosition?: "on-marker" | "top-right" | "none";
+}
+
+function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, labelsPosition = "on-marker" }: MapboxImageDialogProps) {
+  const activeMapStyleId = useReportStore((s) => s.activeMapStyleId) as MapboxStyleId;
+  const styleMeta = MAPBOX_STYLES.find((s) => s.id === activeMapStyleId) ?? MAPBOX_STYLES[0];
+
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const staticData = token
+    ? buildStaticMapUrl({
+        token,
+        lng,
+        lat,
+        activeStyleId: activeMapStyleId,
+        selectedPois,
+      })
+    : null;
+
+  const staticUrl = staticData?.url;
+  const zoom = staticData?.zoom ?? 14;
+
+  const poiCount = Object.values(selectedPois).flat().length;
+  const flatPois = Object.values(selectedPois).flat();
+  const captureRef = useRef<HTMLDivElement>(null);
+
+  const [dims, setDims] = useState({ w: 1200, h: 700 });
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const obs = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setDims({ w: width, h: height });
+    });
+    obs.observe(mapContainerRef.current);
+    return () => obs.disconnect();
+  }, []);
+
+  const handleDownload = async () => {
+    if (!captureRef.current) return;
+    setIsDownloading(true);
+    try {
+      const el = captureRef.current;
+      const dataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2 });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `vicinity-snapshot-${lat.toFixed(4)}-${lng.toFixed(4)}.png`;
+      a.click();
+    } catch {
+      if (staticUrl) window.open(staticUrl, "_blank");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm"
+            onClick={onClose}
+          />
+
+          {/* Dialog */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.93, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.93, y: 20 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
+          >
+            <div
+              ref={captureRef}
+              className="pointer-events-auto w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+              style={{
+                background: "linear-gradient(160deg, #0c1018 0%, #141927 60%, #0f1520 100%)",
+                border: "1px solid rgba(200,185,126,0.18)",
+                maxHeight: "90vh",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div
+                className="flex items-center justify-between px-7 py-5 shrink-0"
+                style={{ borderBottom: "1px solid rgba(200,185,126,0.12)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: "rgba(200,185,126,0.12)", border: "1px solid rgba(200,185,126,0.25)" }}
+                  >
+                    <MapPinned className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  </div>
+                  <div>
+                    <div className="text-[10px] tracking-[0.22em] uppercase font-medium" style={{ color: "#c8b97e99" }}>
+                      Vicinity Snapshot
+                    </div>
+                    <h2 className="text-[17px] font-semibold text-white leading-tight mt-0.5">
+                      Location Intelligence Map
+                    </h2>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-white/10 text-white/50 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Map Image */}
+              <div ref={mapContainerRef} className="relative flex-1 overflow-hidden min-h-0" style={{ minHeight: "340px" }}>
+                {/* Shimmer while loading */}
+                {!imgLoaded && !imgError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background:
+                          "linear-gradient(110deg, #0c1018 30%, #1a2336 50%, #0c1018 70%)",
+                        backgroundSize: "200% 100%",
+                        animation: "shimmer 1.6s infinite linear",
+                      }}
+                    />
+                    <style>{`@keyframes shimmer { from { background-position: 200% center } to { background-position: -200% center } }`}</style>
+                    <div className="relative z-10 flex flex-col items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+                        style={{ borderColor: "#c8b97e55", borderTopColor: "#c8b97e" }}
+                      />
+                      <span className="text-[12px] text-white/40 tracking-wide">Rendering map…</span>
+                    </div>
+                  </div>
+                )}
+
+                {imgError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/40">
+                    <Camera className="w-10 h-10" />
+                    <p className="text-[13px]">Unable to load map image.</p>
+                    {staticUrl && (
+                      <a
+                        href={staticUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[12px] underline"
+                        style={{ color: "#c8b97e" }}
+                      >
+                        Open in browser ↗
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {staticUrl && (
+                  <img
+                    src={staticUrl}
+                    alt="Mapbox static map snapshot"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-cover"
+                    style={{ display: imgLoaded ? "block" : "none" }}
+                    onLoad={() => setImgLoaded(true)}
+                    onError={() => setImgError(true)}
+                  />
+                )}
+
+                {/* HTML Overlays for POIs (Custom Icons + Text Cards) */}
+                {imgLoaded && flatPois.map((poi, i) => {
+                  const pos = latLngToPixel(poi.lat, poi.lng, lat, lng, zoom, dims.w, dims.h);
+                  const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+                  const Icon = meta.Icon;
+                  return (
+                    <div key={i} style={{ position: "absolute", left: pos.x, top: pos.y, zIndex: 20 }}>
+                      {/* The Map Marker Icon */}
+                      <div style={{ 
+                        position: "absolute", left: 0, top: 0, transform: "translate(-50%, -50%)",
+                        width: 26, height: 26, borderRadius: "50%", backgroundColor: meta.color, border: "2px solid white", 
+                        display: "flex", alignItems: "center", justifyContent: "center", 
+                        boxShadow: `0 0 0 3px ${meta.color}40, 0 3px 6px rgba(0,0,0,0.15)`
+                      }}>
+                        <Icon size={12} color="white" strokeWidth={2.5} />
+                      </div>
+
+                      {/* The Label Card (only if on-marker) */}
+                      {labelsPosition === "on-marker" && (
+                        <div style={{
+                          position: "absolute", top: 16, left: -6,
+                          background: "white", borderRadius: 5, padding: "3px 6px", 
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.15)", borderLeft: `3px solid ${meta.color}`,
+                          display: "flex", flexDirection: "column", whiteSpace: "nowrap"
+                        }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2 }}>{poi.name}</span>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: meta.color, lineHeight: 1.2 }}>{poi.distanceKm.toFixed(1)} km</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Top-Right Label List */}
+                {imgLoaded && labelsPosition === "top-right" && (
+                  <div className="absolute top-4 right-4 flex flex-col gap-2 z-30" style={{ pointerEvents: "none" }}>
+                    {flatPois.map((poi, i) => {
+                      const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+                      const Icon = meta.Icon;
+                      return (
+                        <div key={i} style={{ 
+                          display: "flex", alignItems: "center", gap: 8, 
+                          background: "white", padding: "6px 12px", borderRadius: 8, 
+                          boxShadow: "0 2px 12px rgba(0,0,0,0.15)", whiteSpace: "nowrap" 
+                        }}>
+                          <div style={{ width: 18, height: 18, borderRadius: "50%", background: meta.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <Icon size={10} color="white" strokeWidth={2.5} />
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{poi.name}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: meta.color }}>{poi.distanceKm.toFixed(1)} km</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!token && (
+                  <div className="absolute inset-0 flex items-center justify-center text-white/40 text-sm">
+                    Mapbox token not available.
+                  </div>
+                )}
+
+                {/* Gradient vignette at the bottom */}
+                {imgLoaded && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+                    style={{
+                      background:
+                        "linear-gradient(to top, rgba(12,16,24,0.85) 0%, transparent 100%)",
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Footer — info + download */}
+              <div
+                className="flex items-center justify-between px-7 py-5 shrink-0"
+                style={{ borderTop: "1px solid rgba(200,185,126,0.12)" }}
+              >
+                {/* Location info */}
+                <div>
+                  <p className="text-white/90 text-[14px] font-semibold leading-tight">
+                    Vicinity Report — {styleMeta.label} View
+                  </p>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <span
+                      className="text-[11px] font-mono px-2.5 py-1 rounded-full"
+                      style={{ background: "rgba(200,185,126,0.1)", color: "#c8b97e" }}
+                    >
+                      {lat.toFixed(5)}° N, {lng.toFixed(5)}° E
+                    </span>
+                    {poiCount > 0 && (
+                      <span className="text-[11px] text-white/40">
+                        {poiCount} location{poiCount !== 1 ? "s" : ""} plotted
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Download button */}
+                <button
+                  id="download-mapbox-image-btn"
+                  onClick={handleDownload}
+                  disabled={!staticUrl || isDownloading}
+                  className="flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: isDownloading
+                      ? "rgba(200,185,126,0.15)"
+                      : "linear-gradient(135deg, #c8b97e 0%, #a8975e 100%)",
+                    color: isDownloading ? "#c8b97e" : "#0c1018",
+                    boxShadow: isDownloading ? "none" : "0 4px 20px rgba(200,185,126,0.35)",
+                  }}
+                >
+                  {isDownloading ? (
+                    <>
+                      <div
+                        className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+                        style={{ borderColor: "#c8b97e55", borderTopColor: "#c8b97e" }}
+                      />
+                      Downloading…
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Download PNG
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

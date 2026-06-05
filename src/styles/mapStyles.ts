@@ -1,5 +1,8 @@
 import skeletonStyle from "./skeleton-style.json";
 import premiumStyle from "./premium-style.json";
+import highwayFocusedStyle from "./highway-focused.json";
+import hfV2Style from "./hf-v2.json";
+import hfV3Style from "./hf-v3.json";
 
 export const MAP_STYLES: { id: string; label: string; styles: google.maps.MapTypeStyle[] }[] = [
   {
@@ -132,5 +135,20 @@ export const MAP_STYLES: { id: string; label: string; styles: google.maps.MapTyp
     id: "premium-style",
     label: "Premium Style",
     styles: premiumStyle as google.maps.MapTypeStyle[],
+  },
+  {
+    id: "highway-focused",
+    label: "Highway Focused",
+    styles: highwayFocusedStyle as google.maps.MapTypeStyle[],
+  },
+  {
+    id: "hf-v2",
+    label: "HF v2",
+    styles: hfV2Style as google.maps.MapTypeStyle[],
+  },
+  {
+    id: "hf-v3",
+    label: "HF v3",
+    styles: hfV3Style as google.maps.MapTypeStyle[],
   },
 ];
