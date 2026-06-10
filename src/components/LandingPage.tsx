@@ -174,6 +174,16 @@ export default function LandingPage() {
               >
                 Singapur-Huzurabad
               </button>
+              <button
+                onClick={() =>
+                  setInputUrl(
+                    "https://www.google.com/maps/place/Dancing+Daffodils/@17.4505342,78.6581289,1909m/data=!3m1!1e3!4m6!3m5!1s0x3bcb77892dea52bf:0xd0a4d4b565d1be02!8m2!3d17.4535039!4d78.6610873!16s%2Fg%2F11npqkmn9g?entry=ttu&g_ep=EgoyMDI2MDYwMS4wIKXMDSoASAFQAw%3D%3D",
+                  )
+                }
+                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                dancing daffodils - Ghatkesar
+              </button>
             </div>
           </div>
         </div>

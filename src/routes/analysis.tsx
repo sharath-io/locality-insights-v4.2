@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import * as turf from "@turf/turf";
 import {
   useMemo,
   useEffect,
@@ -13,7 +14,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GoogleMap, OverlayView, useJsApiLoader } from "@react-google-maps/api";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ArrowLeft, MapPin, Layers, Sparkles, Camera, Download, X, MapPinned, List } from "lucide-react";
+import { ArrowLeft, MapPin, Layers, Sparkles, Camera, Download, X, MapPinned, List, CircleDot } from "lucide-react";
+import type { BrochurePOI } from "@/components/BrochureDialog";
 import { toPng } from "html-to-image";
 import { useReportStore } from "@/stores/reportStore";
 import type { SelectedPoiEntry } from "@/stores/reportStore";
@@ -58,9 +60,11 @@ function AnalysisPage() {
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
   const resetAnalysis = useReportStore((s) => s.resetAnalysis);
   const [isBrochureOpen, setIsBrochureOpen] = useState(false);
+  const [capturedMapImageUrl, setCapturedMapImageUrl] = useState<string>("");
   const [isMapboxImageOpen, setIsMapboxImageOpen] = useState(false);
   const [isMapboxImageTopRightOpen, setIsMapboxImageTopRightOpen] = useState(false);
   const [isMapboxImageNoLabelsOpen, setIsMapboxImageNoLabelsOpen] = useState(false);
+  const [showDistanceRings, setShowDistanceRings] = useState(false);
   const keys = useMapKeys();
 
   usePlacesSearch();
@@ -77,6 +81,20 @@ function AnalysisPage() {
   }, [resetAnalysis]);
 
   const serial = locationReport?.reportId.replace(/-/g, "").slice(0, 4).toUpperCase() ?? "----";
+  const reportId = locationReport?.reportId ?? `VIC-2026-${serial}`;
+
+  const brochurePOIs: BrochurePOI[] = useMemo(() => {
+    return Object.values(selectedPois).flat().map((p) => ({
+      name: p.name,
+      type: p.type,
+      distanceKm: p.distanceKm,
+    }));
+  }, [selectedPois]);
+
+  const handleGenerateBrochure = (imageDataUrl: string) => {
+    setCapturedMapImageUrl(imageDataUrl);
+    setIsBrochureOpen(true);
+  };
 
   const allPois: PoiRow[] = useMemo(() => {
     if (!locationReport) return [];
@@ -138,7 +156,7 @@ function AnalysisPage() {
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
           style={{ height: "48vh" }}
         >
-          <MapView />
+          <MapView showDistanceRings={showDistanceRings} />
 
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
@@ -202,52 +220,70 @@ function AnalysisPage() {
         <div className="mt-3 flex items-center justify-between">
           <MapStyleSwitcher />
           <div className="flex items-center gap-2">
+            {/* Show Distance Rings — always visible */}
+            <button
+              id="show-distance-rings-btn"
+              onClick={() => setShowDistanceRings((v) => !v)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+              style={{
+                background: showDistanceRings
+                  ? "linear-gradient(135deg, #1a56db15 0%, #1a56db08 100%)"
+                  : "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
+                borderColor: showDistanceRings ? "#1a56db44" : "#e8e2d4",
+                color: showDistanceRings ? "#1a56db" : "var(--navy)",
+                letterSpacing: "-0.01em",
+              }}
+              title={showDistanceRings ? "Hide distance rings" : "Show distance rings (1/2/3/5 km)"}
+            >
+              <CircleDot className="w-4 h-4" style={{ color: showDistanceRings ? "#1a56db" : "var(--gold)" }} />
+              {showDistanceRings ? "Hide Circles" : "Show Circles"}
+            </button>
             {/* Capture Mapbox Image — only visible in Mapbox mode */}
             {mapProvider === "mapbox" && (
               <>
                 <button
                   id="capture-mapbox-image-btn"
                   onClick={() => setIsMapboxImageOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 border"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
                   style={{
-                    background: "linear-gradient(135deg, #c8b97e22 0%, #c8b97e11 100%)",
-                    borderColor: "#c8b97e55",
-                    color: "#8a7a5c",
+                    background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
+                    borderColor: "#e8e2d4",
+                    color: "var(--navy)",
                     letterSpacing: "-0.01em",
                   }}
                   title="Capture current Mapbox view as a static image"
                 >
-                  <Camera className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  <Camera className="w-4 h-4 text-[var(--gold)]" />
                   Capture Map Image
                 </button>
                 <button
                   id="capture-labels-separately-btn"
                   onClick={() => setIsMapboxImageTopRightOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 border"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
                   style={{
-                    background: "linear-gradient(135deg, #c8b97e22 0%, #c8b97e11 100%)",
-                    borderColor: "#c8b97e55",
-                    color: "#8a7a5c",
+                    background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
+                    borderColor: "#e8e2d4",
+                    color: "var(--navy)",
                     letterSpacing: "-0.01em",
                   }}
                   title="Capture image with labels positioned on the top right"
                 >
-                  <List className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  <List className="w-4 h-4 text-[var(--gold)]" />
                   Capture Labels Separately
                 </button>
                 <button
                   id="capture-no-labels-btn"
                   onClick={() => setIsMapboxImageNoLabelsOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95 border"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
                   style={{
-                    background: "linear-gradient(135deg, #c8b97e22 0%, #c8b97e11 100%)",
-                    borderColor: "#c8b97e55",
-                    color: "#8a7a5c",
+                    background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
+                    borderColor: "#e8e2d4",
+                    color: "var(--navy)",
                     letterSpacing: "-0.01em",
                   }}
                   title="Capture image with icons only — no text labels"
                 >
-                  <MapPin className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                  <MapPin className="w-4 h-4 text-[var(--gold)]" />
                   Capture Without Text Labels
                 </button>
               </>
@@ -255,12 +291,13 @@ function AnalysisPage() {
             <button
               id="generate-brochure-btn"
               onClick={() => setIsBrochureOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg border border-transparent"
               style={{
                 background: "linear-gradient(135deg, #0f1e35 0%, #1d3558 100%)",
-                boxShadow: "0 4px 20px rgba(15,30,53,0.3)",
-                letterSpacing: "-0.01em",
+                boxShadow: "0 4px 14px rgba(15,30,53,0.3)",
+                letterSpacing: "0.01em",
               }}
+              title="Generate PDF marketing brochure"
             >
               <Sparkles className="w-4 h-4" style={{ color: "#c8b97e" }} />
               Generate Marketing Brochure
@@ -270,7 +307,14 @@ function AnalysisPage() {
       </section>
 
       {/* Brochure Dialog */}
-      <BrochureDialog open={isBrochureOpen} onClose={() => setIsBrochureOpen(false)} />
+      <BrochureDialog
+        isOpen={isBrochureOpen}
+        onClose={() => setIsBrochureOpen(false)}
+        reportId={reportId}
+        mapImageUrl={capturedMapImageUrl}
+        sourceCoordinates={coordinates ?? undefined}
+        nearbyPOIs={brochurePOIs}
+      />
 
       {/* Mapbox Static Image Dialog */}
       {isMapboxImageOpen && (
@@ -282,6 +326,8 @@ function AnalysisPage() {
           token={keys?.mapboxToken}
           selectedPois={selectedPois}
           labelsPosition="on-marker"
+          showDistanceRings={showDistanceRings}
+          onGenerateBrochure={handleGenerateBrochure}
         />
       )}
 
@@ -295,6 +341,8 @@ function AnalysisPage() {
           token={keys?.mapboxToken}
           selectedPois={selectedPois}
           labelsPosition="top-right"
+          showDistanceRings={showDistanceRings}
+          onGenerateBrochure={handleGenerateBrochure}
         />
       )}
 
@@ -308,6 +356,8 @@ function AnalysisPage() {
           token={keys?.mapboxToken}
           selectedPois={selectedPois}
           labelsPosition="none"
+          showDistanceRings={showDistanceRings}
+          onGenerateBrochure={handleGenerateBrochure}
         />
       )}
 
@@ -506,7 +556,7 @@ function AnalysisPage() {
   );
 }
 
-function MapView() {
+function MapView({ showDistanceRings }: { showDistanceRings?: boolean }) {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
@@ -519,7 +569,7 @@ function MapView() {
   }, [mapProvider, setHoveredPoi]);
 
   if (mapProvider === "mapbox") {
-    return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} />;
+    return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} showDistanceRings={showDistanceRings} />;
   }
   return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
 }
@@ -1070,7 +1120,11 @@ interface CustomMarker extends mapboxgl.Marker {
   __poiId?: string;
 }
 
-function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: string }) {
+// Ring distances in km for the concentric circles overlay
+const RING_DISTANCES_KM = [1, 3, 5];
+const RING_COLOR = "#1a56db";
+
+function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: number; token?: string; showDistanceRings?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, CustomMarker>>(new Map());
@@ -1079,6 +1133,9 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
   const setActiveStyleInStore = useReportStore((s) => s.setActiveMapStyleId);
   const setActiveStyle = (id: MapboxStyleId) => setActiveStyleInStore(id);
   const [showLayers, setShowLayers] = useState(false);
+  // Ref to track the latest showDistanceRings value inside closures (avoids stale capture)
+  const showDistanceRingsRef = useRef(showDistanceRings);
+  useEffect(() => { showDistanceRingsRef.current = showDistanceRings; }, [showDistanceRings]);
   // Skip the changeStyle effect on first render — the map is already initialized
   // with activeStyle, so calling setStyle() again would fire a duplicate style.load
   // which creates an untracked orphan marker (the ghost-marker bug).
@@ -1192,6 +1249,29 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
         applyCinematicLayerOverrides(map, currentStyleMeta.dark);
       } catch {
         /* ignore if layers not ready */
+      }
+      // Re-add distance rings if they were visible before the style switch
+      if (showDistanceRingsRef.current) {
+        const center: [number, number] = [lng, lat];
+        RING_DISTANCES_KM.forEach((km, i) => {
+          const srcId = `ring-src-${km}`;
+          const fillId = `ring-fill-${km}`;
+          const strokeId = `ring-stroke-${km}`;
+          const labelId = `ring-label-${km}`;
+          const labelSrcId = `ring-label-src-${km}`;
+          if (map.getLayer(labelId)) map.removeLayer(labelId);
+          if (map.getLayer(strokeId)) map.removeLayer(strokeId);
+          if (map.getLayer(fillId)) map.removeLayer(fillId);
+          if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
+          if (map.getSource(srcId)) map.removeSource(srcId);
+          const circle = turf.circle(center, km, { units: "kilometers", steps: 64 });
+          map.addSource(srcId, { type: "geojson", data: circle });
+          map.addLayer({ id: fillId, type: "fill", source: srcId, paint: { "fill-color": RING_COLOR, "fill-opacity": 0.02 * (RING_DISTANCES_KM.length - i) } });
+          map.addLayer({ id: strokeId, type: "line", source: srcId, paint: { "line-color": RING_COLOR, "line-width": 1, "line-dasharray": [4, 3], "line-opacity": 0.6 } });
+          const labelPoint = turf.destination(center, km, 0, { units: "kilometers" });
+          map.addSource(labelSrcId, { type: "geojson", data: labelPoint });
+          map.addLayer({ id: labelId, type: "symbol", source: labelSrcId, layout: { "text-field": `${km} km`, "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"], "text-size": 11, "text-anchor": "bottom", "text-offset": [0, -0.5] }, paint: { "text-color": RING_COLOR, "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.5 } });
+        });
       }
     };
 
@@ -1359,6 +1439,96 @@ function MapboxMap({ lat, lng, token }: { lat: number; lng: number; token?: stri
       });
     }
   }, [lat, lng, selectedPoisById, hoveredPoi]);
+
+  // ── Distance ring layers (Turf.js GeoJSON circles) ─────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!map.isStyleLoaded()) return;
+
+    const center: [number, number] = [lng, lat];
+
+    if (showDistanceRings) {
+      RING_DISTANCES_KM.forEach((km, i) => {
+        const srcId = `ring-src-${km}`;
+        const fillId = `ring-fill-${km}`;
+        const strokeId = `ring-stroke-${km}`;
+        const labelId = `ring-label-${km}`;
+
+        // Remove any existing layers/sources first
+        if (map.getLayer(labelId)) map.removeLayer(labelId);
+        if (map.getLayer(strokeId)) map.removeLayer(strokeId);
+        if (map.getLayer(fillId)) map.removeLayer(fillId);
+        if (map.getSource(srcId)) map.removeSource(srcId);
+
+        const circle = turf.circle(center, km, { units: "kilometers", steps: 64 });
+        map.addSource(srcId, { type: "geojson", data: circle });
+
+        // Subtle fill band — inner rings slightly darker
+        map.addLayer({
+          id: fillId,
+          type: "fill",
+          source: srcId,
+          paint: {
+            "fill-color": RING_COLOR,
+            "fill-opacity": 0.02 * (RING_DISTANCES_KM.length - i),
+          },
+        });
+
+        // Dashed stroke
+        map.addLayer({
+          id: strokeId,
+          type: "line",
+          source: srcId,
+          paint: {
+            "line-color": RING_COLOR,
+            "line-width": 1,
+            "line-dasharray": [4, 3],
+            "line-opacity": 0.6,
+          },
+        });
+
+        // Distance label — a symbol layer placed at top of the circle
+        const labelPoint = turf.destination(center, km, 0, { units: "kilometers" });
+        const labelSrcId = `ring-label-src-${km}`;
+        if (map.getLayer(labelId)) map.removeLayer(labelId);
+        if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
+        map.addSource(labelSrcId, { type: "geojson", data: labelPoint });
+        map.addLayer({
+          id: labelId,
+          type: "symbol",
+          source: labelSrcId,
+          layout: {
+            "text-field": `${km} km`,
+            "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+            "text-size": 11,
+            "text-anchor": "bottom",
+            "text-offset": [0, -0.5],
+          },
+          paint: {
+            "text-color": RING_COLOR,
+            "text-halo-color": "rgba(255,255,255,0.9)",
+            "text-halo-width": 1.5,
+          },
+        });
+      });
+    } else {
+      // Remove rings + labels if toggled off
+      RING_DISTANCES_KM.forEach((km) => {
+        const srcId = `ring-src-${km}`;
+        const fillId = `ring-fill-${km}`;
+        const strokeId = `ring-stroke-${km}`;
+        const labelId = `ring-label-${km}`;
+        const labelSrcId = `ring-label-src-${km}`;
+        if (map.getLayer(labelId)) map.removeLayer(labelId);
+        if (map.getLayer(strokeId)) map.removeLayer(strokeId);
+        if (map.getLayer(fillId)) map.removeLayer(fillId);
+        if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
+        if (map.getSource(srcId)) map.removeSource(srcId);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDistanceRings, lat, lng]);
 
   if (!token) {
     return (
@@ -1530,14 +1700,24 @@ function buildStaticMapUrl(opts: {
   selectedPois: Record<string, SelectedPoiEntry[]>;
   width?: number;
   height?: number;
+  showDistanceRings?: boolean;
 }): { url: string, zoom: number } {
-  const { token, lng, lat, activeStyleId, selectedPois, width = 1200, height = 700 } = opts;
+  const { token, lng, lat, activeStyleId, selectedPois, width = 1200, height = 700, showDistanceRings } = opts;
 
   const staticStyle = STATIC_STYLE_MAP[activeStyleId] ?? "mapbox/satellite-streets-v12";
   const overlays: string[] = [];
   overlays.push(`pin-l+e53935(${lng.toFixed(6)},${lat.toFixed(6)})`);
 
-  const poiList = Object.values(selectedPois).flat();
+  const poiList = Object.values(selectedPois).flat().map((p) => ({ lat: p.lat, lng: p.lng }));
+  if (showDistanceRings) {
+    const maxRingKm = Math.max(...RING_DISTANCES_KM);
+    const dLat = maxRingKm / 111.32;
+    const dLng = maxRingKm / (111.32 * Math.cos(lat * Math.PI / 180));
+    poiList.push({ lat: lat + dLat, lng: lng });
+    poiList.push({ lat: lat - dLat, lng: lng });
+    poiList.push({ lat: lat, lng: lng + dLng });
+    poiList.push({ lat: lat, lng: lng - dLng });
+  }
   const zoom = fitZoom({ lat, lng }, poiList, width, height);
 
   const overlayStr = overlays.join(",");
@@ -1562,15 +1742,18 @@ interface MapboxImageDialogProps {
   token?: string;
   selectedPois: Record<string, SelectedPoiEntry[]>;
   labelsPosition?: "on-marker" | "top-right" | "none";
+  showDistanceRings?: boolean;
+  onGenerateBrochure?: (imageDataUrl: string) => void;
 }
 
-function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, labelsPosition = "on-marker" }: MapboxImageDialogProps) {
+function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, labelsPosition = "on-marker", showDistanceRings, onGenerateBrochure }: MapboxImageDialogProps) {
   const activeMapStyleId = useReportStore((s) => s.activeMapStyleId) as MapboxStyleId;
   const styleMeta = MAPBOX_STYLES.find((s) => s.id === activeMapStyleId) ?? MAPBOX_STYLES[0];
 
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCapturingBrochure, setIsCapturingBrochure] = useState(false);
 
   const staticData = token
     ? buildStaticMapUrl({
@@ -1579,6 +1762,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
         lat,
         activeStyleId: activeMapStyleId,
         selectedPois,
+        showDistanceRings,
       })
     : null;
 
@@ -1603,10 +1787,10 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
   }, []);
 
   const handleDownload = async () => {
-    if (!captureRef.current) return;
+    if (!mapContainerRef.current) return;
     setIsDownloading(true);
     try {
-      const el = captureRef.current;
+      const el = mapContainerRef.current;
       const dataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2 });
       const a = document.createElement("a");
       a.href = dataUrl;
@@ -1616,6 +1800,22 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
       if (staticUrl) window.open(staticUrl, "_blank");
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleGenerateBrochure = async () => {
+    if (!captureRef.current || !onGenerateBrochure) return;
+    setIsCapturingBrochure(true);
+    try {
+      // Capture only the map portion (inside captureRef, excluding header+footer)
+      const mapEl = mapContainerRef.current ?? captureRef.current;
+      const dataUrl = await toPng(mapEl, { cacheBust: true, pixelRatio: 2 });
+      onGenerateBrochure(dataUrl);
+      onClose();
+    } catch (e) {
+      console.error("Brochure capture failed:", e);
+    } finally {
+      setIsCapturingBrochure(false);
     }
   };
 
@@ -1799,16 +1999,53 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                   </div>
                 )}
 
-                {/* Gradient vignette at the bottom */}
-                {imgLoaded && (
-                  <div
-                    className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-                    style={{
-                      background:
-                        "linear-gradient(to top, rgba(12,16,24,0.85) 0%, transparent 100%)",
-                    }}
-                  />
+                {/* Distance ring SVG overlay */}
+                {imgLoaded && showDistanceRings && (
+                  <svg
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}
+                    viewBox={`0 0 ${dims.w} ${dims.h}`}
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {RING_DISTANCES_KM.map((km, i) => {
+                      const cx = dims.w / 2;
+                      const cy = dims.h / 2;
+                      const northLat = lat + (km / 111.32);
+                      const northPx = latLngToPixel(northLat, lng, lat, lng, zoom, dims.w, dims.h);
+                      const r = Math.abs(cy - northPx.y);
+                      const fillOpacity = 0.02 * (RING_DISTANCES_KM.length - i);
+                      // Label at top of each ring
+                      const labelX = cx;
+                      const labelY = cy - r - 4;
+                      const pillW = km >= 10 ? 40 : 34;
+                      return (
+                        <g key={km}>
+                          <circle
+                            cx={cx} cy={cy} r={r}
+                            fill={`rgba(26,86,219,${fillOpacity})`}
+                            stroke={RING_COLOR}
+                            strokeWidth={1}
+                            strokeDasharray="5 3"
+                            strokeOpacity={0.6}
+                          />
+                          <rect
+                            x={labelX - pillW / 2} y={labelY - 11}
+                            width={pillW} height={16} rx={8}
+                            fill={RING_COLOR} opacity={0.88}
+                          />
+                          <text
+                            x={labelX} y={labelY + 0.5}
+                            textAnchor="middle"
+                            fontSize={9} fontWeight="700" fill="white"
+                            fontFamily="Inter,system-ui,sans-serif"
+                          >
+                            {km} km
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
                 )}
+
               </div>
 
               {/* Footer — info + download */}
@@ -1836,35 +2073,71 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                   </div>
                 </div>
 
-                {/* Download button */}
-                <button
-                  id="download-mapbox-image-btn"
-                  onClick={handleDownload}
-                  disabled={!staticUrl || isDownloading}
-                  className="flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{
-                    background: isDownloading
-                      ? "rgba(200,185,126,0.15)"
-                      : "linear-gradient(135deg, #c8b97e 0%, #a8975e 100%)",
-                    color: isDownloading ? "#c8b97e" : "#0c1018",
-                    boxShadow: isDownloading ? "none" : "0 4px 20px rgba(200,185,126,0.35)",
-                  }}
-                >
-                  {isDownloading ? (
-                    <>
-                      <div
-                        className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
-                        style={{ borderColor: "#c8b97e55", borderTopColor: "#c8b97e" }}
-                      />
-                      Downloading…
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      Download PNG
-                    </>
+                {/* Buttons row */}
+                <div className="flex items-center gap-3">
+                  {/* Generate Brochure button */}
+                  {onGenerateBrochure && (
+                    <button
+                      id="generate-brochure-from-capture-btn"
+                      onClick={handleGenerateBrochure}
+                      disabled={!imgLoaded || isCapturingBrochure || isDownloading}
+                      className="flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{
+                        background: isCapturingBrochure
+                          ? "rgba(15,30,53,0.5)"
+                          : "linear-gradient(135deg, #0f1e35 0%, #1d3558 100%)",
+                        color: "white",
+                        boxShadow: isCapturingBrochure ? "none" : "0 4px 16px rgba(15,30,53,0.4)",
+                        border: "1px solid rgba(200,185,126,0.25)",
+                      }}
+                    >
+                      {isCapturingBrochure ? (
+                        <>
+                          <div
+                            className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+                            style={{ borderColor: "#c8b97e55", borderTopColor: "#c8b97e" }}
+                          />
+                          Generating…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                          Generate Brochure
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
+
+                  {/* Download button */}
+                  <button
+                    id="download-mapbox-image-btn"
+                    onClick={handleDownload}
+                    disabled={!staticUrl || isDownloading}
+                    className="flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{
+                      background: isDownloading
+                        ? "rgba(200,185,126,0.15)"
+                        : "linear-gradient(135deg, #c8b97e 0%, #a8975e 100%)",
+                      color: isDownloading ? "#c8b97e" : "#0c1018",
+                      boxShadow: isDownloading ? "none" : "0 4px 20px rgba(200,185,126,0.35)",
+                    }}
+                  >
+                    {isDownloading ? (
+                      <>
+                        <div
+                          className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+                          style={{ borderColor: "#c8b97e55", borderTopColor: "#c8b97e" }}
+                        />
+                        Downloading…
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        Download PNG
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
