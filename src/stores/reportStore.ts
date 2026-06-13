@@ -17,7 +17,7 @@ interface ReportState {
   selectedCategories: string[];
   locationReport: LocationReport | null;
   isGenerating: boolean;
-  mapProvider: "google" | "mapbox";
+  mapProvider: "google" | "mapbox-v1" | "mapbox-v2" | "mapbox-coast" | "mapbox-latest-one";
   /** Multiple selected POIs per category type (key = category string, value = array) */
   selectedPois: Record<string, SelectedPoiEntry[]>;
   /** Full data of the POI card currently being hovered (for temp map preview) */
@@ -28,7 +28,7 @@ interface ReportState {
   setSelectedCategories: (v: string[]) => void;
   setLocationReport: (v: LocationReport | null) => void;
   setIsGenerating: (v: boolean) => void;
-  setMapProvider: (v: "google" | "mapbox") => void;
+  setMapProvider: (v: "google" | "mapbox-v1" | "mapbox-v2" | "mapbox-coast" | "mapbox-latest-one") => void;
   /** Toggle a POI selection within its category (add if not present, remove if already selected) */
   togglePoi: (poi: SelectedPoiEntry) => void;
   /** Deselect all POIs for a given category */
@@ -49,7 +49,7 @@ export const useReportStore = create<ReportState>((set) => ({
   mapProvider: "google",
   selectedPois: {},
   hoveredPoi: null,
-  activeMapStyleId: "custom",
+  activeMapStyleId: "default",
 
   setInputUrl: (inputUrl) => set({ inputUrl }),
   setCoordinates: (coordinates) => set({ coordinates }),

@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GoogleMap, OverlayView, useJsApiLoader } from "@react-google-maps/api";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ArrowLeft, MapPin, Layers, Sparkles, Camera, Download, X, MapPinned, List, CircleDot } from "lucide-react";
+import { ArrowLeft, MapPin, Sparkles, Camera, Download, X, List, CircleDot } from "lucide-react";
 import type { BrochurePOI } from "@/components/BrochureDialog";
 import { toPng } from "html-to-image";
 import { useReportStore } from "@/stores/reportStore";
@@ -185,8 +185,8 @@ function AnalysisPage() {
           </div>
 
           {/* Map provider switcher */}
-          <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-full p-1 shadow">
-            {(["google", "mapbox"] as const).map((p) => {
+          <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-3xl p-1 shadow flex-wrap max-w-xl justify-end">
+            {(["google", "mapbox-v1", "mapbox-v2", "mapbox-coast", "mapbox-latest-one"] as const).map((p) => {
               const active = mapProvider === p;
               return (
                 <button
@@ -198,7 +198,11 @@ function AnalysisPage() {
                       : "text-[var(--navy)] hover:bg-[var(--cream)]"
                   }`}
                 >
-                  {p === "google" ? "Google Maps" : "Mapbox"}
+                  {p === "google" ? "Google Maps" : 
+                   p === "mapbox-v1" ? "Mapbox v1" : 
+                   p === "mapbox-v2" ? "Mapbox v2" : 
+                   p === "mapbox-coast" ? "Coast" :
+                   "Latest One"}
                 </button>
               );
             })}
@@ -218,7 +222,7 @@ function AnalysisPage() {
 
         {/* Style selection + Brochure CTA below map */}
         <div className="mt-3 flex items-center justify-between">
-          <MapStyleSwitcher />
+          {mapProvider === "google" ? <MapStyleSwitcher /> : <div />}
           <div className="flex items-center gap-2">
             {/* Show Distance Rings — always visible */}
             <button
@@ -239,7 +243,7 @@ function AnalysisPage() {
               {showDistanceRings ? "Hide Circles" : "Show Circles"}
             </button>
             {/* Capture Mapbox Image — only visible in Mapbox mode */}
-            {mapProvider === "mapbox" && (
+            {mapProvider.startsWith("mapbox") && (
               <>
                 <button
                   id="capture-mapbox-image-btn"
@@ -568,8 +572,8 @@ function MapView({ showDistanceRings }: { showDistanceRings?: boolean }) {
     setHoveredPoi(null);
   }, [mapProvider, setHoveredPoi]);
 
-  if (mapProvider === "mapbox") {
-    return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} showDistanceRings={showDistanceRings} />;
+  if (mapProvider.startsWith("mapbox")) {
+    return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} showDistanceRings={showDistanceRings} provider={mapProvider} />;
   }
   return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
 }
@@ -586,8 +590,6 @@ function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?
 }
 
 function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
-  const [mapTypeId, setMapTypeId] = useState<string>("roadmap");
-  const [showLayers, setShowLayers] = useState(false);
   const selectedPois = useReportStore((s) => s.selectedPois);
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
   const activeMapStyleId = useReportStore((s) => s.activeMapStyleId);
@@ -664,7 +666,6 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
         mapContainerStyle={{ width: "100%", height: "100%" }}
         center={{ lat, lng }}
         zoom={15}
-        mapTypeId={mapTypeId}
         options={{
           disableDefaultUI: true,
           zoomControl: true,
@@ -882,123 +883,18 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
             );
           })()}
       </GoogleMap>
-
-      {/* Layer Selector */}
-      <div
-        className="absolute bottom-6 left-4 z-50 flex items-end gap-2"
-        onMouseEnter={() => setShowLayers(true)}
-        onMouseLeave={() => setShowLayers(false)}
-      >
-        {/* Main trigger button */}
-        <button
-          className="relative w-[60px] h-[60px] rounded-xl shadow-lg border-[2px] border-white overflow-hidden transition-transform hover:scale-105"
-          style={{
-            background: mapTypeId === "satellite" || mapTypeId === "hybrid" ? "#2d3748" : "#e8e2d4",
-          }}
-          onClick={() => setShowLayers(!showLayers)}
-        >
-          <div className="absolute inset-0 bg-black/30" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
-            <Layers className="w-5 h-5 text-white drop-shadow-md mb-0.5" />
-            <span className="text-[10px] font-bold text-white drop-shadow-md tracking-wide">
-              Layers
-            </span>
-          </div>
-        </button>
-
-        {/* Expanding panel */}
-        <AnimatePresence>
-          {showLayers && (
-            <motion.div
-              initial={{ opacity: 0, x: -10, scale: 0.95 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: -10, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-2 flex gap-1 mb-1"
-            >
-              {(["roadmap", "satellite", "hybrid", "terrain"] as const).map((type) => {
-                const isActive = mapTypeId === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setMapTypeId(type)}
-                    className="flex flex-col items-center gap-1.5 w-16 group p-1"
-                  >
-                    <div
-                      className={`w-14 h-14 rounded-xl border-2 transition-all duration-300 ${
-                        isActive
-                          ? "border-blue-500 scale-95 shadow-inner"
-                          : "border-transparent group-hover:border-gray-300 group-hover:shadow"
-                      } overflow-hidden relative flex items-center justify-center`}
-                      style={{
-                        background:
-                          type === "satellite" || type === "hybrid" ? "#2d3748" : "#e8e2d4",
-                      }}
-                    >
-                      <Layers
-                        className={`w-5 h-5 opacity-50 ${type === "satellite" || type === "hybrid" ? "text-white" : "text-gray-600"}`}
-                      />
-                    </div>
-                    <span
-                      className={`text-[11px] capitalize transition-colors ${
-                        isActive
-                          ? "font-bold text-blue-600"
-                          : "font-medium text-gray-500 group-hover:text-gray-800"
-                      }`}
-                    >
-                      {type}
-                    </span>
-                  </button>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }
 
-// Premium cinematic style palette — luxury real-estate brochure aesthetic
-const MAPBOX_STYLES = [
-  {
-    id: "custom",
-    label: "Custom",
-    url: "mapbox://styles/sharath-io/cmq02f0dc000o01qw8c2edjor",
-    dark: true,
-    accent: "#c8b97e",
-  },
-  {
-    id: "dark-v11",
-    label: "Monochrome",
-    url: "mapbox://styles/mapbox/dark-v11",
-    dark: true,
-    accent: "#c8b97e",
-  },
-  {
-    id: "light-v11",
-    label: "Ivory",
-    url: "mapbox://styles/mapbox/light-v11",
-    dark: false,
-    accent: "#8a7a5c",
-  },
-  {
-    id: "satellite-v9",
-    label: "Satellite",
-    url: "mapbox://styles/mapbox/satellite-v9",
-    dark: true,
-    accent: "#6ec6e0",
-  },
-  {
-    id: "outdoors-v12",
-    label: "Terrain",
-    url: "mapbox://styles/mapbox/outdoors-v12",
-    dark: false,
-    accent: "#7aa89b",
-  },
-] as const;
-
-type MapboxStyleId = (typeof MAPBOX_STYLES)[number]["id"];
+// Direct mapping from mapProvider → Mapbox style URLs
+// Each provider value is its own style — no indirection needed.
+const MAPBOX_PROVIDER_STYLES: Record<string, { url: string; staticId: string }> = {
+  "mapbox-v1":         { url: "mapbox://styles/sharath-io/cmq02f0dc000o01qw8c2edjor", staticId: "sharath-io/cmq02f0dc000o01qw8c2edjor" },
+  "mapbox-v2":         { url: "mapbox://styles/sharath-io/cmq9itt8r002801s911meehvf", staticId: "sharath-io/cmq9itt8r002801s911meehvf" },
+  "mapbox-coast":      { url: "mapbox://styles/sharath-io/cmqax8azk003b01qz8dt520di", staticId: "sharath-io/cmqax8azk003b01qz8dt520di" },
+  "mapbox-latest-one": { url: "mapbox://styles/sharath-io/cmqb95m8a000i01shbkcuhzcb", staticId: "sharath-io/cmqb95m8a000i01shbkcuhzcb" },
+};
 
 // Flat 2D camera settings
 const CINEMATIC_PITCH = 0;
@@ -1064,16 +960,6 @@ function applyCinematicLayerOverrides(map: mapboxgl.Map, isDark: boolean) {
 
   // 2D mode — no 3D buildings
 
-  // Tune water color for premium aesthetic
-  for (const layer of allLayers) {
-    if (layer.id.startsWith("water") && layer.type === "fill") {
-      try {
-        map.setPaintProperty(layer.id, "fill-color", isDark ? "#1a2b3c" : "#c9d8e8");
-      } catch {
-        /* skip */
-      }
-    }
-  }
 }
 
 // ── Helper: build a POI marker DOM element ────────────────────────────────
@@ -1124,22 +1010,14 @@ interface CustomMarker extends mapboxgl.Marker {
 const RING_DISTANCES_KM = [1, 3, 5];
 const RING_COLOR = "#1a56db";
 
-function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: number; token?: string; showDistanceRings?: boolean }) {
+function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: number; lng: number; token?: string; showDistanceRings?: boolean; provider: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, CustomMarker>>(new Map());
-  // Sync activeStyle to the global store so siblings (e.g., MapboxImageDialog) can read it
-  const activeStyle = useReportStore((s) => s.activeMapStyleId) as MapboxStyleId;
-  const setActiveStyleInStore = useReportStore((s) => s.setActiveMapStyleId);
-  const setActiveStyle = (id: MapboxStyleId) => setActiveStyleInStore(id);
-  const [showLayers, setShowLayers] = useState(false);
+  const mapProvider = useReportStore((s) => s.mapProvider);
   // Ref to track the latest showDistanceRings value inside closures (avoids stale capture)
   const showDistanceRingsRef = useRef(showDistanceRings);
   useEffect(() => { showDistanceRingsRef.current = showDistanceRings; }, [showDistanceRings]);
-  // Skip the changeStyle effect on first render — the map is already initialized
-  // with activeStyle, so calling setStyle() again would fire a duplicate style.load
-  // which creates an untracked orphan marker (the ghost-marker bug).
-  const isFirstStyleRender = useRef(true);
 
   const selectedPoisRaw = useReportStore((s) => s.selectedPois);
   // Flatten multi-select arrays to a single list for map markers
@@ -1193,10 +1071,10 @@ function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: n
   useEffect(() => {
     if (!token || !containerRef.current) return;
     mapboxgl.accessToken = token;
-    const styleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
+    const styleUrl = MAPBOX_PROVIDER_STYLES[mapProvider]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v1"].url;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: styleMeta.url,
+      style: styleUrl,
       center: [lng, lat],
       zoom: CINEMATIC_ZOOM,
       pitch: CINEMATIC_PITCH,
@@ -1236,7 +1114,6 @@ function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: n
         }
       }
 
-      const currentStyleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
       // Explicitly remove any existing DOM markers before clearing the ref.
       // (Mapbox removes GL layers on setStyle but DOM markers survive — we must
       // clean them up ourselves to prevent orphans.)
@@ -1246,7 +1123,7 @@ function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: n
       syncSelectedMarkersToMap(map, flatPois);
       // Apply cinematic layer overrides after every style.load
       try {
-        applyCinematicLayerOverrides(map, currentStyleMeta.dark);
+        applyCinematicLayerOverrides(map, true);
       } catch {
         /* ignore if layers not ready */
       }
@@ -1289,23 +1166,7 @@ function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, token]);
 
-  // Change style without remounting — skip on initial render to avoid
-  // firing setStyle() on a map that was already initialized with this style.
-  // That double-setStyle caused two style.load events → duplicate markers.
-  useEffect(() => {
-    if (isFirstStyleRender.current) {
-      isFirstStyleRender.current = false;
-      return;
-    }
-    const style = MAPBOX_STYLES.find((s) => s.id === activeStyle);
-    if (style && mapRef.current) {
-      markersRef.current.forEach((m) => m.remove());
-      markersRef.current.clear();
-      mapRef.current.setStyle(style.url);
-      // Restore cinematic camera after style switch
-      mapRef.current.easeTo({ pitch: CINEMATIC_PITCH, bearing: CINEMATIC_BEARING, duration: 600 });
-    }
-  }, [activeStyle]);
+
 
   // Sync selected POI markers imperatively whenever selections change.
   // style.load handles re-hydration after style switches AND initial mount,
@@ -1538,123 +1399,16 @@ function MapboxMap({ lat, lng, token, showDistanceRings }: { lat: number; lng: n
     );
   }
 
-  const currentStyleMeta = MAPBOX_STYLES.find((s) => s.id === activeStyle) ?? MAPBOX_STYLES[0];
-
-  // Swatch background colors for the layer picker
-  const swatchBg: Record<MapboxStyleId, string> = {
-    custom: "linear-gradient(135deg, #1c2235 0%, #2e3a55 100%)",
-    "dark-v11": "linear-gradient(135deg, #1a1f2e 0%, #2d3450 100%)",
-    "light-v11": "linear-gradient(135deg, #f5ede0 0%, #e8dcc8 100%)",
-    "satellite-v9": "linear-gradient(135deg, #1d3a2f 0%, #2a5240 100%)",
-    "outdoors-v12": "linear-gradient(135deg, #d4e8c4 0%, #a8c890 100%)",
-  };
-
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-
-      {/* Premium Layer Selector */}
-      <div
-        className="absolute bottom-5 left-4 z-50 flex items-end gap-2"
-        onMouseEnter={() => setShowLayers(true)}
-        onMouseLeave={() => setShowLayers(false)}
-      >
-        {/* Trigger button */}
-        <button
-          className="relative w-[56px] h-[56px] rounded-xl shadow-lg overflow-hidden transition-all duration-200 hover:scale-105 hover:shadow-xl"
-          style={{
-            background: swatchBg[activeStyle] ?? "#1a1f2e",
-            border: `2px solid ${currentStyleMeta.accent}55`,
-          }}
-          onClick={() => setShowLayers(!showLayers)}
-        >
-          <div className="absolute inset-0 bg-black/20" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-            <Layers className="w-4 h-4 text-white drop-shadow" />
-            <span className="text-[9px] font-semibold text-white/90 tracking-widest uppercase">
-              Style
-            </span>
-          </div>
-        </button>
-
-        {/* Expanding panel */}
-        <AnimatePresence>
-          {showLayers && (
-            <motion.div
-              initial={{ opacity: 0, x: -8, scale: 0.96 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: -8, scale: 0.96 }}
-              transition={{ duration: 0.18 }}
-              className="flex gap-2 mb-1 p-2.5 rounded-2xl shadow-2xl border"
-              style={{
-                background: "rgba(12,16,26,0.88)",
-                backdropFilter: "blur(16px)",
-                borderColor: "rgba(200,185,126,0.2)",
-              }}
-            >
-              {MAPBOX_STYLES.map((style) => {
-                const isActive = activeStyle === style.id;
-                return (
-                  <button
-                    key={style.id}
-                    onClick={() => setActiveStyle(style.id as MapboxStyleId)}
-                    className="flex flex-col items-center gap-1.5 group"
-                    title={style.label}
-                  >
-                    <div
-                      className="w-14 h-12 rounded-lg transition-all duration-250 overflow-hidden relative"
-                      style={{
-                        background: swatchBg[style.id as MapboxStyleId] ?? "#1a1f2e",
-                        border: isActive
-                          ? `2px solid ${style.accent}`
-                          : "2px solid rgba(255,255,255,0.1)",
-                        boxShadow: isActive
-                          ? `0 0 0 1px ${style.accent}55, 0 4px 16px rgba(0,0,0,0.5)`
-                          : "none",
-                        transform: isActive ? "scale(0.95)" : "scale(1)",
-                      }}
-                    >
-                      {/* Mini map preview lines */}
-                      <div
-                        className="absolute inset-0 opacity-30"
-                        style={{
-                          backgroundImage:
-                            "repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.15) 6px, rgba(255,255,255,0.15) 7px)",
-                        }}
-                      />
-                    </div>
-                    <span
-                      className="text-[9px] tracking-wider uppercase font-medium transition-colors"
-                      style={{ color: isActive ? style.accent : "rgba(255,255,255,0.5)" }}
-                    >
-                      {style.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }
 
 // ── Mapbox Static Images API helper ──────────────────────────────────────────
 
-/**
- * Maps each MAPBOX_STYLES id to the standard style id used for static rendering.
- * The custom/cinematic styles render as nearly-black in the Static Images API
- * (the style's dark base layers don't produce visible tiles at static resolution),
- * so we substitute with the closest standard Mapbox style that is guaranteed to render.
- */
-const STATIC_STYLE_MAP: Record<string, string> = {
-  custom: "sharath-io/cmq02f0dc000o01qw8c2edjor", // our custom mapbox style
-  "dark-v11": "mapbox/dark-v11",
-  "light-v11": "mapbox/light-v11",
-  "satellite-v9": "mapbox/satellite-streets-v12", // satellite with labels
-  "outdoors-v12": "mapbox/outdoors-v12",
-};
+
 
 function fitZoom(center: { lat: number; lng: number }, points: { lat: number; lng: number }[], widthPx: number, heightPx: number) {
   if (points.length === 0) return 14;
@@ -1696,15 +1450,15 @@ function buildStaticMapUrl(opts: {
   token: string;
   lng: number;
   lat: number;
-  activeStyleId: string;
+  mapProvider: string;
   selectedPois: Record<string, SelectedPoiEntry[]>;
   width?: number;
   height?: number;
   showDistanceRings?: boolean;
 }): { url: string, zoom: number } {
-  const { token, lng, lat, activeStyleId, selectedPois, width = 1200, height = 700, showDistanceRings } = opts;
+  const { token, lng, lat, mapProvider, selectedPois, width = 1200, height = 700, showDistanceRings } = opts;
 
-  const staticStyle = STATIC_STYLE_MAP[activeStyleId] ?? "mapbox/satellite-streets-v12";
+  const staticStyle = MAPBOX_PROVIDER_STYLES[mapProvider]?.staticId ?? MAPBOX_PROVIDER_STYLES["mapbox-v1"].staticId;
   const overlays: string[] = [];
   overlays.push(`pin-l+e53935(${lng.toFixed(6)},${lat.toFixed(6)})`);
 
@@ -1747,8 +1501,7 @@ interface MapboxImageDialogProps {
 }
 
 function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, labelsPosition = "on-marker", showDistanceRings, onGenerateBrochure }: MapboxImageDialogProps) {
-  const activeMapStyleId = useReportStore((s) => s.activeMapStyleId) as MapboxStyleId;
-  const styleMeta = MAPBOX_STYLES.find((s) => s.id === activeMapStyleId) ?? MAPBOX_STYLES[0];
+  const mapProvider = useReportStore((s) => s.mapProvider);
 
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -1760,7 +1513,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
         token,
         lng,
         lat,
-        activeStyleId: activeMapStyleId,
+        mapProvider,
         selectedPois,
         showDistanceRings,
       })
@@ -1863,7 +1616,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: "rgba(200,185,126,0.12)", border: "1px solid rgba(200,185,126,0.25)" }}
                   >
-                    <MapPinned className="w-4 h-4" style={{ color: "#c8b97e" }} />
+                    <MapPin className="w-4 h-4" style={{ color: "#c8b97e" }} />
                   </div>
                   <div>
                     <div className="text-[10px] tracking-[0.22em] uppercase font-medium" style={{ color: "#c8b97e99" }}>
@@ -2056,7 +1809,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                 {/* Location info */}
                 <div>
                   <p className="text-white/90 text-[14px] font-semibold leading-tight">
-                    Vicinity Report — {styleMeta.label} View
+                    Vicinity Report — Mapbox View
                   </p>
                   <div className="flex items-center gap-3 mt-1.5">
                     <span
