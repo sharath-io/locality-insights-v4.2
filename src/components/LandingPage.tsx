@@ -10,13 +10,13 @@ import {
   Hospital,
   Landmark,
   Camera,
+  Trees,
   ShoppingBag,
-  Train,
-  Bus,
   Building2,
   UtensilsCrossed,
-  Trees,
   Check,
+  Train,
+  Bus,
   type LucideIcon,
 } from "lucide-react";
 import { useReportStore } from "@/stores/reportStore";
@@ -27,21 +27,25 @@ interface Category {
   Icon: LucideIcon;
 }
 
+const TransitIcons = (props: any) => (
+  <div className="flex items-center gap-1.5">
+    <Train {...props} />
+    <span className={props.className} style={{ fontSize: "14px", opacity: 0.4, paddingBottom: "2px" }}>/</span>
+    <Bus {...props} />
+  </div>
+);
+
 const CATEGORIES: Category[] = [
-  { id: "highways", label: "HIGHWAYS", Icon: RouteIcon },
-  { id: "main_roads", label: "MAIN ROADS", Icon: Navigation },
-  { id: "schools", label: "SCHOOLS", Icon: GraduationCap },
-  { id: "colleges", label: "COLLEGES", Icon: BookOpen },
-  { id: "hospitals", label: "HOSPITALS", Icon: Hospital },
-  { id: "temples", label: "TEMPLES", Icon: Landmark },
-  { id: "tourist", label: "TOURIST ATTRACTIONS", Icon: Camera },
-  { id: "shopping", label: "SHOPPING AREAS", Icon: ShoppingBag },
-  { id: "metro", label: "METRO/RAILWAY", Icon: Train },
-  { id: "bus", label: "BUS STOPS", Icon: Bus },
-  { id: "it_parks", label: "IT PARKS", Icon: Building2 },
-  { id: "restaurants", label: "RESTAURANTS", Icon: UtensilsCrossed },
-  { id: "lakes_parks", label: "LAKES/PARKS", Icon: Trees },
-  { id: "landmarks", label: "LANDMARKS", Icon: MapPin },
+  { id: "hospitals",    label: "HOSPITALS",      Icon: Hospital },
+  { id: "it_parks",     label: "IT PARKS",       Icon: Building2 },
+  { id: "highways",      label: "HIGHWAYS",      Icon: RouteIcon },
+  { id: "temples",      label: "TEMPLES",        Icon: Landmark },
+  { id: "restaurants",  label: "RESTAURANTS",    Icon: UtensilsCrossed },
+  { id: "shopping",     label: "SHOPPING AREAS", Icon: ShoppingBag },
+  { id: "education",    label: "EDUCATION",      Icon: GraduationCap },
+  { id: "transit",      label: "PUBLIC TRANSIT", Icon: TransitIcons as unknown as LucideIcon },
+  { id: "attractions",  label: "ATTRACTIONS",    Icon: Camera },
+  { id: "main_roads",   label: "MAIN ROADS",    Icon: Navigation },
 ];
 
 const ALL_IDS = CATEGORIES.map((c) => c.id);
@@ -184,6 +188,16 @@ export default function LandingPage() {
               >
                 dancing daffodils - Ghatkesar
               </button>
+              <button
+                onClick={() =>
+                  setInputUrl(
+                    "https://www.google.com/maps/place/17%C2%B019'43.8%22N+77%C2%B050'24.8%22E/@17.3288314,77.8402224,1852m/data=!3m1!1e3!4m4!3m3!8m2!3d17.3288314!4d77.8402224?hl=en-GB&entry=ttu&g_ep=EgoyMDI2MDYxMC4wIKXMDSoASAFQAw%3D%3D",
+                  )
+                }
+                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                Dharur - Vikarabad
+              </button>
             </div>
           </div>
         </div>
@@ -227,33 +241,120 @@ export default function LandingPage() {
                 transition={{ delay: i * 0.03, duration: 0.3, ease: "easeOut" }}
                 onClick={() => toggle(cat.id)}
                 whileHover={{ y: -1 }}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${
+                className={`px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${
+                  cat.id === "main_roads" ? "sm:col-span-2 lg:col-span-3" : ""
+                } ${
+                  ["transit", "education", "attractions"].includes(cat.id) ? "row-span-2 flex flex-col justify-center gap-4" : "flex items-center gap-3"
+                } ${
                   isSelected
                     ? "border-[var(--gold)] bg-[var(--navy)]/[0.04] shadow-[0_6px_18px_-8px_rgba(15,30,53,0.35)]"
                     : "border-[#e8e2d4] bg-white hover:border-[var(--navy)]/40 hover:shadow-sm"
                 }`}
               >
-                <span
-                  className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
-                    isSelected
-                      ? "bg-[var(--navy)] border-[var(--navy)]"
-                      : "border-[#cfc7b3] bg-white"
-                  }`}
-                >
-                  {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
-                </span>
-                <Icon
-                  size={18}
-                  className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"}
-                  strokeWidth={isSelected ? 2.25 : 1.75}
-                />
-                <span
-                  className={`text-[11px] font-semibold tracking-wider ${
-                    isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"
-                  }`}
-                >
-                  {cat.label}
-                </span>
+                {cat.id === "transit" ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
+                          isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
+                        }`}
+                      >
+                        {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
+                      </span>
+                      <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>
+                        {cat.label}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-3 pl-[32px]">
+                      <div className="flex items-center gap-2">
+                        <Bus size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>BUS</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Train size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>METRO</span>
+                      </div>
+                    </div>
+                  </>
+                ) : cat.id === "education" ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
+                          isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
+                        }`}
+                      >
+                        {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
+                      </span>
+                      <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>
+                        {cat.label}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-3 pl-[32px]">
+                      <div className="flex items-center gap-2">
+                        <BookOpen size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>SCHOOL</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>UNIVERSITY</span>
+                      </div>
+                    </div>
+                  </>
+                ) : cat.id === "attractions" ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
+                          isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
+                        }`}
+                      >
+                        {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
+                      </span>
+                      <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>
+                        {cat.label}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-3 pl-[32px]">
+                      <div className="flex items-center gap-2">
+                        <Camera size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>VIEW POINT</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Trees size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>PARK</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Landmark size={16} className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"} strokeWidth={isSelected ? 2.25 : 1.75} />
+                        <span className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"}`}>MUSEUM</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
+                        isSelected
+                          ? "bg-[var(--navy)] border-[var(--navy)]"
+                          : "border-[#cfc7b3] bg-white"
+                      }`}
+                    >
+                      {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
+                    </span>
+                    <Icon
+                      size={18}
+                      className={isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/70"}
+                      strokeWidth={isSelected ? 2.25 : 1.75}
+                    />
+                    <span
+                      className={`text-[11px] font-semibold tracking-wider ${
+                        isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"
+                      }`}
+                    >
+                      {cat.label}
+                    </span>
+                  </>
+                )}
               </motion.button>
             );
           })}

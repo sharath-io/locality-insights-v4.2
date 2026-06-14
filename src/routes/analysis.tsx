@@ -21,7 +21,7 @@ import { useReportStore } from "@/stores/reportStore";
 import type { SelectedPoiEntry } from "@/stores/reportStore";
 import { usePlacesSearch } from "@/hooks/usePlacesSearch";
 import { useMapKeys } from "@/hooks/useMapKeys";
-import { CATEGORY_META } from "@/lib/map-styles";
+import { CATEGORY_META, resolvePoiMeta } from "@/lib/map-styles";
 import { MapStyleSwitcher } from "@/components/MapStyleSwitcher";
 import { MAP_STYLES } from "@/styles/mapStyles";
 import { BrochureDialog } from "@/components/BrochureDialog";
@@ -126,6 +126,7 @@ function AnalysisPage() {
         lat: p.lat,
         lng: p.lng,
         distanceKm: p.distanceKm,
+        types: p.types,
       });
     },
     [togglePoi],
@@ -165,7 +166,7 @@ function AnalysisPage() {
           {/* Selected POIs List (Top Right) */}
           <div className="absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(48vh-80px)] overflow-y-auto pointer-events-none [&::-webkit-scrollbar]:hidden z-50">
             {Object.values(selectedPois).flat().sort((a, b) => a.distanceKm - b.distanceKm).map((poi) => {
-              const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+              const meta = resolvePoiMeta(poi.type, poi.types);
               const Icon = meta.Icon;
               return (
                 <div 
@@ -186,7 +187,7 @@ function AnalysisPage() {
 
           {/* Map provider switcher */}
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-3xl p-1 shadow flex-wrap max-w-xl justify-end">
-            {(["google", "mapbox-v1", "mapbox-v2", "mapbox-coast", "mapbox-latest-one"] as const).map((p) => {
+            {(["google", "mapbox-v1", "mapbox-v2", "mapbox-v3", "mapbox-coast", "mapbox-skeleton"] as const).map((p) => {
               const active = mapProvider === p;
               return (
                 <button
@@ -201,8 +202,9 @@ function AnalysisPage() {
                   {p === "google" ? "Google Maps" : 
                    p === "mapbox-v1" ? "Mapbox v1" : 
                    p === "mapbox-v2" ? "Mapbox v2" : 
-                   p === "mapbox-coast" ? "Coast" :
-                   "Latest One"}
+                   p === "mapbox-v3" ? "Mapbox v3" : 
+                   p === "mapbox-coast" ? "Coastal" : 
+                   "Skeleton"}
                 </button>
               );
             })}
@@ -409,7 +411,7 @@ function AnalysisPage() {
         {!isGenerating && groupedPois.length > 0 && (
           <div className="space-y-10">
             {groupedPois.map(({ type, items }) => {
-              const meta = CATEGORY_META[type] ?? { Icon: MapPin, color: "#666" };
+              const meta = resolvePoiMeta(type);
               const Icon = meta.Icon;
               const selectedInCategory = selectedPois[type] ?? [];
               const pinnedCount = selectedInCategory.length;
@@ -448,12 +450,13 @@ function AnalysisPage() {
                     {items.map((p) => {
                       const isSelected = selectedInCategory.some((s) => s.id === p.id);
                       const isHovered = hoveredPoi?.id === p.id;
+                      const poiMeta = resolvePoiMeta(type, p.types);
+                      const PoiIcon = poiMeta.Icon;
 
                       return (
                         <motion.button
                           key={p.id}
                           onClick={() => handleSelect(p)}
-
                           whileHover={{ scale: 1.015 }}
                           whileTap={{ scale: 0.98 }}
                           transition={{ duration: 0.15 }}
@@ -471,8 +474,8 @@ function AnalysisPage() {
                           style={
                             isSelected
                               ? {
-                                  borderColor: meta.color,
-                                  boxShadow: `0 0 0 2px ${meta.color}25, 0 4px 12px ${meta.color}15`,
+                                  borderColor: poiMeta.color,
+                                  boxShadow: `0 0 0 2px ${poiMeta.color}25, 0 4px 12px ${poiMeta.color}15`,
                                 }
                               : {}
                           }
@@ -482,8 +485,8 @@ function AnalysisPage() {
                             <div
                               className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200"
                               style={{
-                                borderColor: isSelected ? meta.color : "#d4cec5",
-                                background: isSelected ? meta.color : "transparent",
+                                borderColor: isSelected ? poiMeta.color : "#d4cec5",
+                                background: isSelected ? poiMeta.color : "transparent",
                               }}
                             >
                               {isSelected && (
@@ -510,11 +513,11 @@ function AnalysisPage() {
                           <div
                             className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
                             style={{
-                              background: isSelected ? `${meta.color}20` : "#faf8f4",
-                              border: `1px solid ${isSelected ? meta.color + "40" : "#f0ebe0"}`,
+                              background: isSelected ? `${poiMeta.color}20` : "#faf8f4",
+                              border: `1px solid ${isSelected ? poiMeta.color + "40" : "#f0ebe0"}`,
                             }}
                           >
-                            <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                            <PoiIcon className="w-4 h-4" style={{ color: poiMeta.color }} />
                           </div>
 
                           {/* Content */}
@@ -703,7 +706,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
 
         {/* Selected POI markers — circular icon badges */}
         {poisToShow.map((poi) => {
-          const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+          const meta = resolvePoiMeta(poi.type, poi.types);
           const Icon = meta.Icon;
           const isThisHovered = hoveredPoi?.id === poi.id;
           const size = 30;
@@ -793,7 +796,7 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
         {hoveredPoi &&
           !hoveredIsAlreadySelected &&
           (() => {
-            const meta = CATEGORY_META[hoveredPoi.type] ?? { Icon: MapPin, color: "#666" };
+            const meta = resolvePoiMeta(hoveredPoi.type, hoveredPoi.types);
             const Icon = meta.Icon;
             return (
               <OverlayView
@@ -892,8 +895,9 @@ function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey
 const MAPBOX_PROVIDER_STYLES: Record<string, { url: string; staticId: string }> = {
   "mapbox-v1":         { url: "mapbox://styles/sharath-io/cmq02f0dc000o01qw8c2edjor", staticId: "sharath-io/cmq02f0dc000o01qw8c2edjor" },
   "mapbox-v2":         { url: "mapbox://styles/sharath-io/cmq9itt8r002801s911meehvf", staticId: "sharath-io/cmq9itt8r002801s911meehvf" },
+  "mapbox-v3":         { url: "mapbox://styles/sharath-io/cmqcb7oh1008j01qxheqi92cb", staticId: "sharath-io/cmqcb7oh1008j01qxheqi92cb" },
   "mapbox-coast":      { url: "mapbox://styles/sharath-io/cmqax8azk003b01qz8dt520di", staticId: "sharath-io/cmqax8azk003b01qz8dt520di" },
-  "mapbox-latest-one": { url: "mapbox://styles/sharath-io/cmqb95m8a000i01shbkcuhzcb", staticId: "sharath-io/cmqb95m8a000i01shbkcuhzcb" },
+  "mapbox-skeleton":   { url: "mapbox://styles/sharath-io/cmqb95m8a000i01shbkcuhzcb", staticId: "sharath-io/cmqb95m8a000i01shbkcuhzcb" },
 };
 
 // Flat 2D camera settings
@@ -964,7 +968,7 @@ function applyCinematicLayerOverrides(map: mapboxgl.Map, isDark: boolean) {
 
 // ── Helper: build a POI marker DOM element ────────────────────────────────
 function createPoiMarkerEl(poi: SelectedPoiEntry, options: { opacity?: number } = {}) {
-  const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+  const meta = resolvePoiMeta(poi.type, poi.types);
   let iconSvgStr = "";
   try {
     iconSvgStr = renderToStaticMarkup(
@@ -1166,7 +1170,12 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, token]);
 
-
+  // Update map style when provider changes without re-initializing the map
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const styleUrl = MAPBOX_PROVIDER_STYLES[provider]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v1"].url;
+    mapRef.current.setStyle(styleUrl);
+  }, [provider]);
 
   // Sync selected POI markers imperatively whenever selections change.
   // style.load handles re-hydration after style switches AND initial mount,
@@ -1693,7 +1702,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                 {/* HTML Overlays for POIs (Custom Icons + Text Cards) */}
                 {imgLoaded && flatPois.map((poi, i) => {
                   const pos = latLngToPixel(poi.lat, poi.lng, lat, lng, zoom, dims.w, dims.h);
-                  const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+                  const meta = resolvePoiMeta(poi.type, poi.types);
                   const Icon = meta.Icon;
                   return (
                     <div key={i} style={{ position: "absolute", left: pos.x, top: pos.y, zIndex: 20 }}>
@@ -1727,7 +1736,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                 {imgLoaded && labelsPosition === "top-right" && (
                   <div className="absolute top-4 right-4 flex flex-col gap-2 z-30" style={{ pointerEvents: "none" }}>
                     {flatPois.map((poi, i) => {
-                      const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
+                      const meta = resolvePoiMeta(poi.type, poi.types);
                       const Icon = meta.Icon;
                       return (
                         <div key={i} style={{ 

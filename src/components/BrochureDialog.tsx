@@ -83,27 +83,27 @@ export interface BrochureGeneratorProps {
 
 const DEF_COORDS = { lat: 17.71862, lng: 83.33144 };
 const DEF_POIS: BrochurePOI[] = [
-  { name: "Visakha Museum",      type: "TOURIST ATTRACTIONS", distanceKm: 0.3 },
-  { name: "RK Beach",             type: "LAKES/PARKS",         distanceKm: 1.6 },
-  { name: "King George Hospital", type: "HOSPITALS",           distanceKm: 2.9 },
-  { name: "Tenneti Park",         type: "LAKES/PARKS",         distanceKm: 3.8 },
+  { name: "Visakha Museum",      type: "ATTRACTIONS", distanceKm: 0.3 },
+  { name: "RK Beach",             type: "ATTRACTIONS", distanceKm: 1.6 },
+  { name: "King George Hospital", type: "HOSPITALS",   distanceKm: 2.9 },
+  { name: "Tenneti Park",         type: "ATTRACTIONS", distanceKm: 3.8 },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function generateHighlights(pois: BrochurePOI[]): string[] {
   const out: string[] = [];
-  const hasBeachOrTourist = pois.some((p) =>
-    ["TOURIST ATTRACTIONS", "LAKES/PARKS"].includes(p.type) ||
+  const hasAttraction = pois.some((p) =>
+    p.type === "ATTRACTIONS" ||
     p.name.toLowerCase().includes("beach")
   );
-  if (hasBeachOrTourist) out.push("Beach & Tourist attractions close by");
+  if (hasAttraction) out.push("Beach & Tourist attractions close by");
 
   const hospital = pois.find((p) => p.type === "HOSPITALS");
   if (hospital) out.push(`Hospitals within ${Math.ceil(hospital.distanceKm + 0.5)} km radius`);
 
-  const hasPark = pois.some((p) => p.type === "LAKES/PARKS");
-  if (hasPark) out.push("Parks & Recreation nearby");
+  const hasAttractionsOrPark = pois.some((p) => p.type === "ATTRACTIONS");
+  if (hasAttractionsOrPark) out.push("Parks & Recreation nearby");
 
   const hasHighway = pois.some((p) => ["HIGHWAYS", "MAIN ROADS"].includes(p.type));
   if (hasHighway) out.push("Well connected to National Highway");

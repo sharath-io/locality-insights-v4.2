@@ -2,21 +2,20 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { LocationReport, POIGroup, POIItem, BBox } from "@/types";
 
-const CATEGORY_TO_TYPE: Record<string, string> = {
-  HOSPITALS: "hospital",
-  SCHOOLS: "school",
-  COLLEGES: "university",
-  "METRO/RAILWAY": "subway_station",
-  "BUS STOPS": "bus_station",
-  "IT PARKS": "accounting",
+// Maps each UI category label → one or more Google Places API includedTypes.
+// Combined categories send multiple types in a single API call — cheaper and
+// prevents the same POI appearing under two separate category buckets.
+const CATEGORY_TO_TYPE: Record<string, string | string[]> = {
+  HOSPITALS:        "hospital",
+  EDUCATION:        ["school", "university"],
+  "PUBLIC TRANSIT": ["subway_station", "bus_station", "train_station"],
+  "IT PARKS":       "office",
   "SHOPPING AREAS": "shopping_mall",
-  TEMPLES: "hindu_temple",
-  RESTAURANTS: "restaurant",
-  "TOURIST ATTRACTIONS": "tourist_attraction",
-  "LAKES/PARKS": "park",
-  LANDMARKS: "museum",
-  HIGHWAYS: "gas_station",
-  "MAIN ROADS": "transit_station",
+  TEMPLES:          "hindu_temple",
+  RESTAURANTS:      "restaurant",
+  ATTRACTIONS:      ["park", "tourist_attraction", "museum"],
+  HIGHWAYS:         "gas_station",
+  "MAIN ROADS":     "transit_station",
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -53,6 +52,11 @@ export const nearbySearch = createServerFn({ method: "POST" })
         if (!mappedType) return { type: cat, items: [] as POIItem[] };
 
         try {
+          // Resolve to an array of Google Places types (combined categories
+          // pass multiple types in a single request to avoid duplicates and
+          // reduce total API call count).
+          const includedTypes = Array.isArray(mappedType) ? mappedType : [mappedType];
+
           const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
             method: "POST",
             headers: {
@@ -67,8 +71,8 @@ export const nearbySearch = createServerFn({ method: "POST" })
                   radius: radiusMeters,
                 },
               },
-              includedTypes: [mappedType],
-              maxResultCount: 5,
+              includedTypes,
+              maxResultCount: 10,
             }),
           });
 
@@ -79,9 +83,11 @@ export const nearbySearch = createServerFn({ method: "POST" })
 
           const json = (await res.json()) as {
             places?: Array<{
+              id: string;
               displayName?: { text?: string };
               location?: { latitude: number; longitude: number };
               rating?: number;
+              types?: string[];
             }>;
           };
 
@@ -92,7 +98,10 @@ export const nearbySearch = createServerFn({ method: "POST" })
               const pLng = p.location!.longitude;
               const distanceKm = +haversineKm(lat, lng, pLat, pLng).toFixed(2);
               return {
+                id: p.id,
                 name: p.displayName?.text ?? "Unknown",
+                type: cat,
+                types: p.types || [],
                 lat: pLat,
                 lng: pLng,
                 rating: p.rating,

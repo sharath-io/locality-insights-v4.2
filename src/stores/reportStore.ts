@@ -8,6 +8,7 @@ export type SelectedPoiEntry = {
   lat: number;
   lng: number;
   distanceKm: number;
+  types?: string[];
 };
 
 
@@ -17,7 +18,7 @@ interface ReportState {
   selectedCategories: string[];
   locationReport: LocationReport | null;
   isGenerating: boolean;
-  mapProvider: "google" | "mapbox-v1" | "mapbox-v2" | "mapbox-coast" | "mapbox-latest-one";
+  mapProvider: "google" | "mapbox-v1" | "mapbox-v2" | "mapbox-v3" | "mapbox-coast" | "mapbox-skeleton";
   /** Multiple selected POIs per category type (key = category string, value = array) */
   selectedPois: Record<string, SelectedPoiEntry[]>;
   /** Full data of the POI card currently being hovered (for temp map preview) */
@@ -28,7 +29,7 @@ interface ReportState {
   setSelectedCategories: (v: string[]) => void;
   setLocationReport: (v: LocationReport | null) => void;
   setIsGenerating: (v: boolean) => void;
-  setMapProvider: (v: "google" | "mapbox-v1" | "mapbox-v2" | "mapbox-coast" | "mapbox-latest-one") => void;
+  setMapProvider: (v: "google" | "mapbox-v1" | "mapbox-v2" | "mapbox-v3" | "mapbox-coast" | "mapbox-skeleton") => void;
   /** Toggle a POI selection within its category (add if not present, remove if already selected) */
   togglePoi: (poi: SelectedPoiEntry) => void;
   /** Deselect all POIs for a given category */
