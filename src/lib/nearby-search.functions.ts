@@ -14,7 +14,7 @@ const CATEGORY_TO_TYPE: Record<string, string | string[]> = {
   TEMPLES:          "hindu_temple",
   RESTAURANTS:      "restaurant",
   ATTRACTIONS:      ["park", "tourist_attraction", "museum"],
-  HIGHWAYS:         "gas_station",
+  "PETROL PUMPS":   "gas_station",
   "MAIN ROADS":     "transit_station",
 };
 

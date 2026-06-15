@@ -17,6 +17,7 @@ import {
   Check,
   Train,
   Bus,
+  Fuel,
   type LucideIcon,
 } from "lucide-react";
 import { useReportStore } from "@/stores/reportStore";
@@ -38,7 +39,7 @@ const TransitIcons = (props: any) => (
 const CATEGORIES: Category[] = [
   { id: "hospitals",    label: "HOSPITALS",      Icon: Hospital },
   { id: "it_parks",     label: "IT PARKS",       Icon: Building2 },
-  { id: "highways",      label: "HIGHWAYS",      Icon: RouteIcon },
+  { id: "petrol_pumps",  label: "PETROL PUMPS",  Icon: Fuel },
   { id: "temples",      label: "TEMPLES",        Icon: Landmark },
   { id: "restaurants",  label: "RESTAURANTS",    Icon: UtensilsCrossed },
   { id: "shopping",     label: "SHOPPING AREAS", Icon: ShoppingBag },

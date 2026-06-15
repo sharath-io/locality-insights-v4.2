@@ -13,6 +13,7 @@ import {
   Trees,
   BookOpen,
   Bus,
+  Fuel,
 } from "lucide-react";
 
 export const CATEGORY_META: Record<string, { Icon: typeof MapPin; color: string }> = {
@@ -25,7 +26,7 @@ export const CATEGORY_META: Record<string, { Icon: typeof MapPin; color: string 
   TEMPLES:          { Icon: Landmark,       color: "#F4B400" },
   RESTAURANTS:      { Icon: UtensilsCrossed, color: "#FF7043" },
   ATTRACTIONS:      { Icon: Camera,         color: "#43A047" },
-  HIGHWAYS:         { Icon: RouteIcon,      color: "#555"    },
+  "PETROL PUMPS":   { Icon: Fuel,           color: "#f59e0b" },
   "MAIN ROADS":     { Icon: Navigation,     color: "#666"    },
 };
 
