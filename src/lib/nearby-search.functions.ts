@@ -62,7 +62,7 @@ export const nearbySearch = createServerFn({ method: "POST" })
             headers: {
               "Content-Type": "application/json",
               "X-Goog-Api-Key": apiKey,
-              "X-Goog-FieldMask": "places.displayName,places.location,places.rating,places.types",
+              "X-Goog-FieldMask": "places.displayName,places.location,places.rating,places.userRatingCount,places.types",
             },
             body: JSON.stringify({
               locationRestriction: {
@@ -87,6 +87,7 @@ export const nearbySearch = createServerFn({ method: "POST" })
               displayName?: { text?: string };
               location?: { latitude: number; longitude: number };
               rating?: number;
+              userRatingCount?: number;
               types?: string[];
             }>;
           };
@@ -105,6 +106,7 @@ export const nearbySearch = createServerFn({ method: "POST" })
                 lat: pLat,
                 lng: pLng,
                 rating: p.rating,
+                userRatingCount: p.userRatingCount,
                 distanceKm,
                 minutesDrive: Math.max(1, Math.round(distanceKm / 0.5)),
               };

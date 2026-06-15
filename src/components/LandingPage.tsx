@@ -148,14 +148,14 @@ export default function LandingPage() {
             </button>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <span className="text-[10px] tracking-[0.1em] text-white/50 uppercase w-full mb-1">
-                Quick Select:
+              <span className="text-[11px] font-medium tracking-widest text-white/40 uppercase w-full mb-2">
+                Quick Select
               </span>
               {QUICK_LOCATIONS.map((loc) => (
                 <button
                   key={loc.name}
                   onClick={() => setInputUrl(loc.url)}
-                  className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  className="text-xs tracking-wide px-3.5 py-2 bg-white/5 border border-white/10 rounded-md text-white/80 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all cursor-pointer font-medium"
                 >
                   {loc.name}
                 </button>

@@ -42,6 +42,7 @@ type PoiRow = {
   distanceKm: number;
   minutesDrive: number;
   rating?: number;
+  userRatingCount?: number;
   types?: string[];
 };
 
@@ -112,7 +113,22 @@ function AnalysisPage() {
       if (!groups.has(p.type)) groups.set(p.type, []);
       groups.get(p.type)!.push(p);
     }
-    return Array.from(groups.entries()).map(([type, items]) => ({ type, items }));
+    return Array.from(groups.entries()).map(([type, items]) => {
+      const sorted = [...items].sort((a, b) => {
+        const distA = Math.max(0.1, a.distanceKm);
+        const distB = Math.max(0.1, b.distanceKm);
+
+        const scoreA = ((a.rating || 0) * (a.userRatingCount || 0)) / distA;
+        const scoreB = ((b.rating || 0) * (b.userRatingCount || 0)) / distB;
+
+        const diff = scoreB - scoreA;
+        if (diff !== 0) return diff;
+
+        return a.distanceKm - b.distanceKm;
+      });
+
+      return { type, items: sorted.slice(0, 5) };
+    });
   }, [allPois]);
 
   const handleSelect = useCallback(

@@ -5,6 +5,7 @@ export interface POIItem {
   lat: number;
   lng: number;
   rating?: number;
+  userRatingCount?: number;
   types?: string[];
 }
 

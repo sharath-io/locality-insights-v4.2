@@ -13,8 +13,8 @@ export const QUICK_LOCATIONS: QuickLocation[] = [
     url: "https://www.google.com/maps/place/Prasads+Multiplex/@17.4129805,78.4631181,925m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bcb975afb4afadd:0xf89ea8407df6c84!8m2!3d17.4129805!4d78.465693!16s%2Fg%2F11bwpm1dpl?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D",
   },
   {
-    name: "Singapur-Huzurabad",
-    url: "https://www.google.com/maps/place/18%C2%B015'29.1%22N+79%C2%B022'21.6%22E/@18.2580937,79.372669,1842m/data=!3m1!1e3!4m4!3m3!8m2!3d18.2580937!4d79.372669?entry=tts&g_ep=EgoyMDI2MDUyNS4wIPu8ASoASAFQAw%3D%3D&skid=9d8be7de-f4f4-414a-92d1-2ca39c47ad1b",
+    name: "Alakananda - RiverFront",
+    url: "https://www.google.com/maps/place/Alakananda+RiverFront/@16.82539,80.0895502,928m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3a35efb4adfd1173:0x344f8b9c70eb2aec!8m2!3d16.82539!4d80.0921251!16s%2Fg%2F11byxf_2q_?entry=tts&g_ep=EgoyMDI2MDYxMC4wIPu8ASoASAFQAw%3D%3D&skid=fe3f2380-1029-430c-bad1-be77f03b0db9",
   },
   {
     name: "dancing daffodils - Ghatkesar",
