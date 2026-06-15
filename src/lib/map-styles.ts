@@ -14,6 +14,7 @@ import {
   BookOpen,
   Bus,
   Fuel,
+  Briefcase,
 } from "lucide-react";
 
 export const CATEGORY_META: Record<string, { Icon: typeof MapPin; color: string }> = {
@@ -21,12 +22,12 @@ export const CATEGORY_META: Record<string, { Icon: typeof MapPin; color: string 
   HOSPITALS:        { Icon: Hospital,       color: "#E53935" },
   EDUCATION:        { Icon: GraduationCap,  color: "#7E57C2" },
   "PUBLIC TRANSIT": { Icon: Train,          color: "#3949AB" },
-  "IT PARKS":       { Icon: Building2,      color: "#1E88E5" },
   "SHOPPING AREAS": { Icon: ShoppingBag,    color: "#EC407A" },
   TEMPLES:          { Icon: Landmark,       color: "#F4B400" },
   RESTAURANTS:      { Icon: UtensilsCrossed, color: "#FF7043" },
   ATTRACTIONS:      { Icon: Camera,         color: "#43A047" },
   "PETROL PUMPS":   { Icon: Fuel,           color: "#f59e0b" },
+  "BUSINESS HUBS":  { Icon: Briefcase,      color: "#00897B" },
   "MAIN ROADS":     { Icon: Navigation,     color: "#666"    },
 };
 

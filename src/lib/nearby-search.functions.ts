@@ -9,13 +9,13 @@ const CATEGORY_TO_TYPE: Record<string, string | string[]> = {
   HOSPITALS:        "hospital",
   EDUCATION:        ["school", "university"],
   "PUBLIC TRANSIT": ["subway_station", "bus_station", "train_station"],
-  "IT PARKS":       "office",
   "SHOPPING AREAS": "shopping_mall",
   TEMPLES:          "hindu_temple",
   RESTAURANTS:      "restaurant",
   ATTRACTIONS:      ["park", "tourist_attraction", "museum"],
   "PETROL PUMPS":   "gas_station",
   "MAIN ROADS":     "transit_station",
+  "BUSINESS HUBS":  ["corporate_office", "coworking_space"],
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {

@@ -18,9 +18,11 @@ import {
   Train,
   Bus,
   Fuel,
+  Briefcase,
   type LucideIcon,
 } from "lucide-react";
 import { useReportStore } from "@/stores/reportStore";
+import { QUICK_LOCATIONS } from "@/lib/quick-locations";
 
 interface Category {
   id: string;
@@ -38,15 +40,15 @@ const TransitIcons = (props: any) => (
 
 const CATEGORIES: Category[] = [
   { id: "hospitals",    label: "HOSPITALS",      Icon: Hospital },
-  { id: "it_parks",     label: "IT PARKS",       Icon: Building2 },
-  { id: "petrol_pumps",  label: "PETROL PUMPS",  Icon: Fuel },
+  { id: "business_hubs",label: "BUSINESS HUBS",  Icon: Briefcase },
+  { id: "petrol_pumps", label: "PETROL PUMPS",   Icon: Fuel },
   { id: "temples",      label: "TEMPLES",        Icon: Landmark },
   { id: "restaurants",  label: "RESTAURANTS",    Icon: UtensilsCrossed },
   { id: "shopping",     label: "SHOPPING AREAS", Icon: ShoppingBag },
   { id: "education",    label: "EDUCATION",      Icon: GraduationCap },
   { id: "transit",      label: "PUBLIC TRANSIT", Icon: TransitIcons as unknown as LucideIcon },
   { id: "attractions",  label: "ATTRACTIONS",    Icon: Camera },
-  { id: "main_roads",   label: "MAIN ROADS",    Icon: Navigation },
+  { id: "main_roads",   label: "MAIN ROADS",     Icon: Navigation },
 ];
 
 const ALL_IDS = CATEGORIES.map((c) => c.id);
@@ -149,56 +151,15 @@ export default function LandingPage() {
               <span className="text-[10px] tracking-[0.1em] text-white/50 uppercase w-full mb-1">
                 Quick Select:
               </span>
-              <button
-                onClick={() =>
-                  setInputUrl(
-                    "https://www.google.com/maps/place/Vasenapoli/@17.7186198,83.3314418,17z/data=!3m1!4b1!4m6!3m5!1s0x3a394527f8ebd033:0xe28c02bede9b038!8m2!3d17.7186198!4d83.3314418!16s%2Fg%2F11fb0vl5f3?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D",
-                  )
-                }
-                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              >
-                Vizag - Vasenapoli
-              </button>
-              <button
-                onClick={() =>
-                  setInputUrl(
-                    "https://www.google.com/maps/place/Prasads+Multiplex/@17.4129805,78.4631181,925m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bcb975afb4afadd:0xf89ea8407df6c84!8m2!3d17.4129805!4d78.465693!16s%2Fg%2F11bwpm1dpl?entry=ttu&g_ep=EgoyMDI2MDUyMC4wIKXMDSoASAFQAw%3D%3D",
-                  )
-                }
-                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              >
-                Prasads Multiplex Hyd
-              </button>
-              <button
-                onClick={() =>
-                  setInputUrl(
-                    "https://www.google.com/maps/place/18%C2%B015'29.1%22N+79%C2%B022'21.6%22E/@18.2580937,79.372669,1842m/data=!3m1!1e3!4m4!3m3!8m2!3d18.2580937!4d79.372669?entry=tts&g_ep=EgoyMDI2MDUyNS4wIPu8ASoASAFQAw%3D%3D&skid=9d8be7de-f4f4-414a-92d1-2ca39c47ad1b",
-                  )
-                }
-                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              >
-                Singapur-Huzurabad
-              </button>
-              <button
-                onClick={() =>
-                  setInputUrl(
-                    "https://www.google.com/maps/place/Dancing+Daffodils/@17.4505342,78.6581289,1909m/data=!3m1!1e3!4m6!3m5!1s0x3bcb77892dea52bf:0xd0a4d4b565d1be02!8m2!3d17.4535039!4d78.6610873!16s%2Fg%2F11npqkmn9g?entry=ttu&g_ep=EgoyMDI2MDYwMS4wIKXMDSoASAFQAw%3D%3D",
-                  )
-                }
-                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              >
-                dancing daffodils - Ghatkesar
-              </button>
-              <button
-                onClick={() =>
-                  setInputUrl(
-                    "https://www.google.com/maps/place/17%C2%B019'43.8%22N+77%C2%B050'24.8%22E/@17.3288314,77.8402224,1852m/data=!3m1!1e3!4m4!3m3!8m2!3d17.3288314!4d77.8402224?hl=en-GB&entry=ttu&g_ep=EgoyMDI2MDYxMC4wIKXMDSoASAFQAw%3D%3D",
-                  )
-                }
-                className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              >
-                Dharur - Vikarabad
-              </button>
+              {QUICK_LOCATIONS.map((loc) => (
+                <button
+                  key={loc.name}
+                  onClick={() => setInputUrl(loc.url)}
+                  className="text-[10px] tracking-[0.05em] px-3 py-1.5 border border-white/20 rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                >
+                  {loc.name}
+                </button>
+              ))}
             </div>
           </div>
         </div>
