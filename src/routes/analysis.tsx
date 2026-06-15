@@ -291,20 +291,6 @@ function AnalysisPage() {
                 </button>
               </>
             )}
-            <button
-              id="generate-brochure-btn"
-              onClick={() => setIsBrochureOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg border border-transparent"
-              style={{
-                background: "linear-gradient(135deg, #0f1e35 0%, #1d3558 100%)",
-                boxShadow: "0 4px 14px rgba(15,30,53,0.3)",
-                letterSpacing: "0.01em",
-              }}
-              title="Generate PDF marketing brochure"
-            >
-              <Sparkles className="w-4 h-4" style={{ color: "#c8b97e" }} />
-              Generate Marketing Brochure
-            </button>
           </div>
         </div>
       </section>
