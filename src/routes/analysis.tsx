@@ -11,7 +11,6 @@ import {
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { motion, AnimatePresence } from "framer-motion";
-import { GoogleMap, OverlayView, useJsApiLoader } from "@react-google-maps/api";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { ArrowLeft, MapPin, Sparkles, Camera, Download, X, List, CircleDot } from "lucide-react";
@@ -22,8 +21,6 @@ import type { SelectedPoiEntry } from "@/stores/reportStore";
 import { usePlacesSearch } from "@/hooks/usePlacesSearch";
 import { useMapKeys } from "@/hooks/useMapKeys";
 import { CATEGORY_META, resolvePoiMeta } from "@/lib/map-styles";
-import { MapStyleSwitcher } from "@/components/MapStyleSwitcher";
-import { MAP_STYLES } from "@/styles/mapStyles";
 import { BrochureDialog } from "@/components/BrochureDialog";
 
 export const Route = createFileRoute("/analysis")({
@@ -45,6 +42,7 @@ type PoiRow = {
   distanceKm: number;
   minutesDrive: number;
   rating?: number;
+  types?: string[];
 };
 
 function AnalysisPage() {
@@ -187,7 +185,7 @@ function AnalysisPage() {
 
           {/* Map provider switcher */}
           <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-3xl p-1 shadow flex-wrap max-w-xl justify-end">
-            {(["google", "mapbox-v1", "mapbox-v2", "mapbox-v3", "mapbox-coast", "mapbox-skeleton"] as const).map((p) => {
+            {(["mapbox-v1", "mapbox-v2", "mapbox-v3", "mapbox-coast", "mapbox-skeleton"] as const).map((p) => {
               const active = mapProvider === p;
               return (
                 <button
@@ -199,8 +197,7 @@ function AnalysisPage() {
                       : "text-[var(--navy)] hover:bg-[var(--cream)]"
                   }`}
                 >
-                  {p === "google" ? "Google Maps" : 
-                   p === "mapbox-v1" ? "Mapbox v1" : 
+                  {p === "mapbox-v1" ? "Mapbox v1" : 
                    p === "mapbox-v2" ? "Mapbox v2" : 
                    p === "mapbox-v3" ? "Mapbox v3" : 
                    p === "mapbox-coast" ? "Coastal" : 
@@ -224,7 +221,7 @@ function AnalysisPage() {
 
         {/* Style selection + Brochure CTA below map */}
         <div className="mt-3 flex items-center justify-between">
-          {mapProvider === "google" ? <MapStyleSwitcher /> : <div />}
+          <div />
           <div className="flex items-center gap-2">
             {/* Show Distance Rings — always visible */}
             <button
@@ -575,319 +572,7 @@ function MapView({ showDistanceRings }: { showDistanceRings?: boolean }) {
     setHoveredPoi(null);
   }, [mapProvider, setHoveredPoi]);
 
-  if (mapProvider.startsWith("mapbox")) {
-    return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} showDistanceRings={showDistanceRings} provider={mapProvider} />;
-  }
-  return <GoogleMapView lat={coordinates.lat} lng={coordinates.lng} apiKey={keys?.googleMapsKey} />;
-}
-
-function GoogleMapView({ lat, lng, apiKey }: { lat: number; lng: number; apiKey?: string }) {
-  if (!apiKey) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-[var(--cream)] text-[var(--muted)] text-sm">
-        Loading map…
-      </div>
-    );
-  }
-  return <GoogleMapInner lat={lat} lng={lng} apiKey={apiKey} />;
-}
-
-function GoogleMapInner({ lat, lng, apiKey }: { lat: number; lng: number; apiKey: string }) {
-  const selectedPois = useReportStore((s) => s.selectedPois);
-  const hoveredPoi = useReportStore((s) => s.hoveredPoi);
-  const activeMapStyleId = useReportStore((s) => s.activeMapStyleId);
-  const mapRef = useRef<google.maps.Map | null>(null);
-
-  const activeStyle = MAP_STYLES.find((s) => s.id === activeMapStyleId) || MAP_STYLES[0];
-
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: apiKey,
-  });
-
-  // Flatten multi-select arrays to a single list for map rendering
-  const poisToShow = useMemo(() => Object.values(selectedPois).flat(), [selectedPois]);
-  // Show hovered POI as preview if it's not already checked/selected
-  const hoveredIsAlreadySelected = hoveredPoi
-    ? poisToShow.some((p) => p.id === hoveredPoi.id)
-    : false;
-
-  // Zoom to fit bounds while keeping center exactly at `lat, lng`
-  useEffect(() => {
-    if (!mapRef.current) return;
-    const map = mapRef.current;
-
-    const activePois = [
-      ...poisToShow,
-      ...(hoveredPoi && !hoveredIsAlreadySelected ? [hoveredPoi] : []),
-    ];
-
-    if (activePois.length === 0) {
-      map.setCenter({ lat, lng });
-      map.setZoom(15);
-      return;
-    }
-
-    let maxDeltaLat = 0;
-    let maxDeltaLng = 0;
-    activePois.forEach((p) => {
-      maxDeltaLat = Math.max(maxDeltaLat, Math.abs(p.lat - lat));
-      maxDeltaLng = Math.max(maxDeltaLng, Math.abs(p.lng - lng));
-    });
-
-    if (maxDeltaLat > 0 || maxDeltaLng > 0) {
-      const PADDING_FACTOR = 1.3;
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend({
-        lat: lat + maxDeltaLat * PADDING_FACTOR,
-        lng: lng + maxDeltaLng * PADDING_FACTOR,
-      });
-      bounds.extend({
-        lat: lat - maxDeltaLat * PADDING_FACTOR,
-        lng: lng - maxDeltaLng * PADDING_FACTOR,
-      });
-      map.fitBounds(bounds);
-    }
-  }, [lat, lng, selectedPois, hoveredPoi, hoveredIsAlreadySelected]);
-
-  useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.setOptions({ styles: activeStyle.styles });
-    }
-  }, [activeStyle]);
-
-  if (!isLoaded) {
-    return <div className="w-full h-full bg-[var(--cream)]" />;
-  }
-
-  return (
-    <div className="relative w-full h-full">
-      <GoogleMap
-        onLoad={(map) => {
-          mapRef.current = map;
-        }}
-        mapContainerStyle={{ width: "100%", height: "100%" }}
-        center={{ lat, lng }}
-        zoom={15}
-        options={{
-          disableDefaultUI: true,
-          zoomControl: true,
-          styles: activeStyle.styles,
-        }}
-      >
-        {/* Site pin (red) */}
-        <OverlayView position={{ lat, lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-          <div
-            style={{
-              transform: "translate(-50%, -100%)",
-              zIndex: 700,
-              position: "relative",
-            }}
-            className="pointer-events-none"
-          >
-            <svg
-              width="35"
-              height="46"
-              viewBox="0 0 34 44"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M17 1.5C8.44 1.5 1.5 8.44 1.5 17c0 11.5 14.2 24.6 14.8 25.2.4.4 1 .4 1.4 0C18.3 41.6 32.5 28.5 32.5 17 32.5 8.44 25.56 1.5 17 1.5Z"
-                fill="#E53935"
-                stroke="#ffffff"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <circle cx="17" cy="17" r="5.5" fill="#ffffff" />
-            </svg>
-          </div>
-        </OverlayView>
-
-        {/* Selected POI markers — circular icon badges */}
-        {poisToShow.map((poi) => {
-          const meta = resolvePoiMeta(poi.type, poi.types);
-          const Icon = meta.Icon;
-          const isThisHovered = hoveredPoi?.id === poi.id;
-          const size = 30;
-
-          return (
-            <OverlayView
-              key={poi.id}
-              position={{ lat: poi.lat, lng: poi.lng }}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-            >
-              <div
-                style={{
-                  width: size,
-                  height: size,
-                  transform: "translate(-50%, -50%)",
-                  zIndex: isThisHovered ? 900 : 600,
-                  position: "relative",
-                  pointerEvents: "none",
-                }}
-              >
-                {/* Hover tooltip */}
-                {isThisHovered && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: `${size / 2 + 10}px`,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      whiteSpace: "nowrap",
-                      background: "#0f1e35",
-                      color: "white",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "6px 10px",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
-                      zIndex: 1000,
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {poi.name}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        width: 0,
-                        height: 0,
-                        borderLeft: "5px solid transparent",
-                        borderRight: "5px solid transparent",
-                        borderTop: "5px solid #0f1e35",
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Circular icon badge */}
-                <div
-                  style={{
-                    width: size,
-                    height: size,
-                    borderRadius: "50%",
-                    background: meta.color,
-                    border: "3px solid white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: isThisHovered
-                      ? `0 6px 20px ${meta.color}70, 0 0 0 3px ${meta.color}30`
-                      : `0 2px 10px rgba(0,0,0,0.28)`,
-                    transition: "all 0.2s ease",
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    zIndex: 1,
-                  }}
-                >
-                  <Icon size={14} color="white" strokeWidth={2.5} />
-                </div>
-              </div>
-            </OverlayView>
-          );
-        })}
-
-        {/* Hovered POI preview marker (semi-transparent, temporary) */}
-        {hoveredPoi &&
-          !hoveredIsAlreadySelected &&
-          (() => {
-            const meta = resolvePoiMeta(hoveredPoi.type, hoveredPoi.types);
-            const Icon = meta.Icon;
-            return (
-              <OverlayView
-                position={{ lat: hoveredPoi.lat, lng: hoveredPoi.lng }}
-                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              >
-                <div
-                  style={{
-                    transform: "translate(-50%, -50%)",
-                    zIndex: 850,
-                    position: "relative",
-                    pointerEvents: "none",
-                  }}
-                >
-                  {/* Tooltip */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "33px",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      whiteSpace: "nowrap",
-                      background: "#0f1e35",
-                      color: "white",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "6px 10px",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
-                      zIndex: 1000,
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {hoveredPoi.name}
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        width: 0,
-                        height: 0,
-                        borderLeft: "5px solid transparent",
-                        borderRight: "5px solid transparent",
-                        borderTop: "5px solid #0f1e35",
-                      }}
-                    />
-                  </div>
-
-                  {/* Semi-transparent pulse ring */}
-                  <div
-                    className="animate-ping"
-                    style={{
-                      position: "absolute",
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      background: meta.color,
-                      opacity: 0.2,
-                      top: "50%",
-                      left: "50%",
-                      transform: "translate(-50%, -50%)",
-                    }}
-                  />
-
-                  {/* Preview circle badge (semi-transparent) */}
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "50%",
-                      background: meta.color,
-                      border: "2px solid white",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: `0 4px 16px ${meta.color}50`,
-                      opacity: 0.65,
-                      position: "relative",
-                      zIndex: 1,
-                    }}
-                  >
-                    <Icon size={14} color="white" strokeWidth={2.5} />
-                  </div>
-                </div>
-              </OverlayView>
-            );
-          })()}
-      </GoogleMap>
-    </div>
-  );
+  return <MapboxMap lat={coordinates.lat} lng={coordinates.lng} token={keys?.mapboxToken} showDistanceRings={showDistanceRings} provider={mapProvider} />;
 }
 
 // Direct mapping from mapProvider → Mapbox style URLs
