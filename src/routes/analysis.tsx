@@ -854,7 +854,6 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
   // a marker that hydrateMarkers will later duplicate.
   useEffect(() => {
     if (!mapRef.current) return;
-    if (!mapRef.current.isStyleLoaded()) return;
     const map = mapRef.current;
     const currentIds = new Set(Object.keys(selectedPoisById));
     const existingIds = new Set(markersRef.current.keys());
