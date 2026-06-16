@@ -319,6 +319,9 @@ function AnalysisPage() {
         mapImageUrl={capturedMapImageUrl}
         sourceCoordinates={coordinates ?? undefined}
         nearbyPOIs={brochurePOIs}
+        propertyDetails={{
+          subtitle: locationReport?.site?.label !== "Site Location" ? locationReport?.site?.label : undefined,
+        }}
       />
 
       {/* Mapbox Static Image Dialog */}

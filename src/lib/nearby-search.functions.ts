@@ -35,6 +35,35 @@ const inputSchema = z.object({
   radiusMeters: z.number().min(100).max(50000),
 });
 
+async function getFormattedAddress(lat: number, lng: number): Promise<string> {
+  try {
+    const mapboxToken = process.env.MAPBOX_TOKEN;
+    if (!mapboxToken) return "Site Location";
+
+    const res = await fetch(`https://api.mapbox.com/search/geocode/v6/reverse?longitude=${lng}&latitude=${lat}&access_token=${mapboxToken}`);
+    if (!res.ok) return "Site Location";
+    const data = await res.json() as any;
+    
+    if (data.features && data.features.length > 0) {
+      const context = data.features[0].properties?.context || {};
+      
+      const area = context.locality?.name;
+      const place = context.place?.name;
+      const district = context.district?.name;
+      const state = context.region?.name;
+      
+      const parts = [area, place, district, state].filter(Boolean);
+      const uniqueParts = [...new Set(parts)];
+      if (uniqueParts.length > 0) {
+        return uniqueParts.join(", ");
+      }
+    }
+  } catch (err) {
+    console.error("Reverse geocode failed:", err);
+  }
+  return "Site Location";
+}
+
 export const nearbySearch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }): Promise<LocationReport> => {
@@ -152,8 +181,10 @@ export const nearbySearch = createServerFn({ method: "POST" })
     const totalPlaces = groups.reduce((n, g) => n + g.items.length, 0);
     console.log("SERVER: Total places found: ", totalPlaces);
 
+    const siteLabel = await getFormattedAddress(lat, lng);
+
     return {
-      site: { lat, lng, label: "Site Location" },
+      site: { lat, lng, label: siteLabel },
       pois: groups,
       bbox,
       reportId: crypto.randomUUID(),
