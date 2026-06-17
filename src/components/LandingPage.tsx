@@ -19,6 +19,12 @@ import {
   Bus,
   Fuel,
   Briefcase,
+  ShoppingCart,
+  Dumbbell,
+  Pill,
+  Coffee,
+  Banknote,
+  Clapperboard,
   type LucideIcon,
 } from "lucide-react";
 import { useReportStore } from "@/stores/reportStore";
@@ -39,16 +45,21 @@ const TransitIcons = (props: any) => (
 );
 
 const CATEGORIES: Category[] = [
-  { id: "hospitals",    label: "HOSPITALS",      Icon: Hospital },
-  { id: "business_hubs",label: "BUSINESS HUBS",  Icon: Briefcase },
-  { id: "petrol_pumps", label: "PETROL PUMPS",   Icon: Fuel },
-  { id: "temples",      label: "TEMPLES",        Icon: Landmark },
-  { id: "restaurants",  label: "RESTAURANTS",    Icon: UtensilsCrossed },
-  { id: "shopping",     label: "SHOPPING AREAS", Icon: ShoppingBag },
-  { id: "education",    label: "EDUCATION",      Icon: GraduationCap },
-  { id: "transit",      label: "PUBLIC TRANSIT", Icon: TransitIcons as unknown as LucideIcon },
-  { id: "attractions",  label: "ATTRACTIONS",    Icon: Camera },
-  { id: "main_roads",   label: "MAIN ROADS",     Icon: Navigation },
+  { id: "hospitals",        label: "HOSPITALS",       Icon: Hospital },
+  { id: "business_hubs",    label: "BUSINESS HUBS",   Icon: Briefcase },
+  { id: "petrol_pumps",     label: "PETROL PUMPS",    Icon: Fuel },
+  { id: "temples",          label: "TEMPLES",         Icon: Landmark },
+  { id: "restaurants",      label: "RESTAURANTS",     Icon: UtensilsCrossed },
+  { id: "shopping",         label: "SHOPPING AREAS",  Icon: ShoppingBag },
+  { id: "education",        label: "EDUCATION",       Icon: GraduationCap },
+  { id: "transit",          label: "PUBLIC TRANSIT",  Icon: TransitIcons as unknown as LucideIcon },
+  { id: "attractions",      label: "ATTRACTIONS",     Icon: Camera },
+  { id: "supermarkets",     label: "SUPERMARKETS",    Icon: ShoppingCart },
+  { id: "fitness_centers",  label: "FITNESS CENTERS", Icon: Dumbbell },
+  { id: "pharmacies",       label: "PHARMACIES",      Icon: Pill },
+  { id: "cafes",            label: "CAFES",           Icon: Coffee },
+  { id: "banks_atms",       label: "BANKS & ATMs",    Icon: Banknote },
+  { id: "entertainment",    label: "ENTERTAINMENT",   Icon: Clapperboard },
 ];
 
 const ALL_IDS = CATEGORIES.map((c) => c.id);
@@ -241,8 +252,6 @@ export default function LandingPage() {
                 onClick={() => toggle(cat.id)}
                 whileHover={{ y: -1 }}
                 className={`px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${
-                  cat.id === "main_roads" ? "sm:col-span-2 lg:col-span-3" : ""
-                } ${
                   ["transit", "education", "attractions"].includes(cat.id) ? "row-span-2 flex flex-col justify-center gap-4" : "flex items-center gap-3"
                 } ${
                   isSelected

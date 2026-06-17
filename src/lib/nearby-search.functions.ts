@@ -6,16 +6,23 @@ import type { LocationReport, POIGroup, POIItem, BBox } from "@/types";
 // Combined categories send multiple types in a single API call — cheaper and
 // prevents the same POI appearing under two separate category buckets.
 const CATEGORY_TO_TYPE: Record<string, string | string[]> = {
-  HOSPITALS:        "hospital",
-  EDUCATION:        ["school", "university"],
-  "PUBLIC TRANSIT": ["subway_station", "bus_station", "train_station"],
-  "SHOPPING AREAS": "shopping_mall",
-  TEMPLES:          "hindu_temple",
-  RESTAURANTS:      "restaurant",
-  ATTRACTIONS:      ["park", "tourist_attraction", "museum"],
-  "PETROL PUMPS":   "gas_station",
-  "MAIN ROADS":     "transit_station",
-  "BUSINESS HUBS":  ["corporate_office", "coworking_space"],
+  // ── Existing Core Categories ──────────────────────────────────────────────
+  HOSPITALS:          "hospital",
+  EDUCATION:          ["school", "university"],
+  "PUBLIC TRANSIT":   ["subway_station", "bus_station", "train_station"],
+  "SHOPPING AREAS":   "shopping_mall",
+  TEMPLES:            "hindu_temple",
+  RESTAURANTS:        "restaurant",
+  ATTRACTIONS:        ["park", "tourist_attraction", "museum"],
+  "PETROL PUMPS":     "gas_station",
+  "BUSINESS HUBS":    ["corporate_office", "coworking_space"],
+  // ── New Lifestyle & Convenience Categories ───────────────────────────────
+  SUPERMARKETS:       ["supermarket", "grocery_store", "convenience_store"],
+  "FITNESS CENTERS":  ["gym", "fitness_center", "sports_complex"],
+  PHARMACIES:         ["pharmacy", "medical_clinic", "dentist"],
+  CAFES:              ["cafe", "coffee_shop"],
+  "BANKS & ATMs":     ["bank", "atm"],
+  ENTERTAINMENT:      ["movie_theater", "movie_rental", "bowling_alley"],
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {

@@ -310,13 +310,23 @@ function AnalysisPage() {
           </div>
 
           {isGenerating && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-sm">
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative w-12 h-12">
+            <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-md z-50">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center gap-5 bg-white/90 border border-white/60 shadow-xl rounded-2xl p-8 backdrop-blur-xl"
+              >
+                <div className="relative flex items-center justify-center w-16 h-16">
+                  <div className="absolute inset-0 rounded-full bg-[var(--gold)]/20 animate-ping" />
+                  <div className="absolute inset-0 rounded-full border-4 border-[var(--gold)]/30" />
                   <div className="absolute inset-0 rounded-full border-4 border-[var(--gold)] border-t-transparent animate-spin" />
+                  <MapPin className="w-5 h-5 text-[var(--gold)]" />
                 </div>
-                <div className="text-[var(--navy)] font-medium">Analyzing vicinity...</div>
-              </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="text-[11px] font-bold tracking-[0.2em] text-[var(--gold)] uppercase">Scanning Area</div>
+                  <div className="text-[var(--navy)] font-semibold text-sm animate-pulse">Gathering vicinity data...</div>
+                </div>
+              </motion.div>
             </div>
           )}
         </div>
@@ -481,16 +491,24 @@ function AnalysisPage() {
 
         {/* Loading skeleton */}
         {isGenerating && (
-          <div className="space-y-8">
+          <div className="space-y-10">
             {[1, 2, 3].map((i) => (
               <div key={i} className="animate-pulse">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-[#e8e2d4]" />
-                  <div className="h-5 w-48 bg-[#e8e2d4] rounded" />
+                  <div className="w-8 h-8 rounded-lg bg-[#e8e2d4]/60" />
+                  <div className="h-4 w-32 bg-[#e8e2d4]/60 rounded" />
+                  <div className="h-px flex-1 bg-gradient-to-r from-[#e8e2d4]/60 to-transparent ml-2" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map((j) => (
-                    <div key={j} className="h-20 bg-white rounded-xl border border-[#e8e2d4]" />
+                    <div key={j} className="flex items-start gap-3 bg-white rounded-xl p-4 border border-[#e8e2d4]/60 shadow-sm">
+                      <div className="shrink-0 mt-0.5 w-5 h-5 rounded-md bg-[#e8e2d4]/40" />
+                      <div className="w-9 h-9 rounded-full bg-[#e8e2d4]/40 shrink-0" />
+                      <div className="flex-1 space-y-2 mt-1.5">
+                        <div className="h-3.5 bg-[#e8e2d4]/60 rounded w-3/4" />
+                        <div className="h-3 bg-[#e8e2d4]/40 rounded w-1/2" />
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1109,16 +1127,18 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
             },
           });
 
-          // Dashed stroke
+          // Dashed stroke — thickness decreases outward (proximity hierarchy)
+          // i=0 → 1km (boldest), i=1 → 3km, i=2 → 5km (lightest)
+          const ringLineWidth = i === 0 ? 2.5 : i === 1 ? 2 : 1.5;
           map.addLayer({
             id: strokeId,
             type: "line",
             source: srcId,
             paint: {
               "line-color": RING_COLOR,
-              "line-width": 1,
-              "line-dasharray": [4, 3],
-              "line-opacity": 0.6,
+              "line-width": ringLineWidth,
+              "line-dasharray": [6, 4],
+              "line-opacity": 0.7,
             },
           });
 
@@ -1577,15 +1597,16 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
                       const labelX = cx;
                       const labelY = cy - r - 4;
                       const pillW = km >= 10 ? 40 : 34;
+                      const svgStrokeWidth = i === 0 ? 2.5 : i === 1 ? 2 : 1.5;
                       return (
                         <g key={km}>
                           <circle
                             cx={cx} cy={cy} r={r}
                             fill={`rgba(26,86,219,${fillOpacity})`}
                             stroke={RING_COLOR}
-                            strokeWidth={1}
-                            strokeDasharray="5 3"
-                            strokeOpacity={0.6}
+                            strokeWidth={svgStrokeWidth}
+                            strokeDasharray="6 4"
+                            strokeOpacity={0.7}
                           />
                           <rect
                             x={labelX - pillW / 2} y={labelY - 11}

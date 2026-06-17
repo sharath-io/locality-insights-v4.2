@@ -15,20 +15,32 @@ import {
   Bus,
   Fuel,
   Briefcase,
+  ShoppingCart,
+  Dumbbell,
+  Pill,
+  Coffee,
+  Banknote,
+  Clapperboard,
 } from "lucide-react";
 
 export const CATEGORY_META: Record<string, { Icon: typeof MapPin; color: string }> = {
-  // ── Current categories (10) ──────────────────────────────────────────────
-  HOSPITALS:        { Icon: Hospital,       color: "#E53935" },
-  EDUCATION:        { Icon: GraduationCap,  color: "#7E57C2" },
-  "PUBLIC TRANSIT": { Icon: Train,          color: "#3949AB" },
-  "SHOPPING AREAS": { Icon: ShoppingBag,    color: "#EC407A" },
-  TEMPLES:          { Icon: Landmark,       color: "#F4B400" },
-  RESTAURANTS:      { Icon: UtensilsCrossed, color: "#FF7043" },
-  ATTRACTIONS:      { Icon: Camera,         color: "#43A047" },
-  "PETROL PUMPS":   { Icon: Fuel,           color: "#f59e0b" },
-  "BUSINESS HUBS":  { Icon: Briefcase,      color: "#00897B" },
-  "MAIN ROADS":     { Icon: Navigation,     color: "#666"    },
+  // ── Existing Core Categories ──────────────────────────────────────────────
+  HOSPITALS:          { Icon: Hospital,        color: "#E53935" },
+  EDUCATION:          { Icon: GraduationCap,   color: "#7E57C2" },
+  "PUBLIC TRANSIT":   { Icon: Train,           color: "#3949AB" },
+  "SHOPPING AREAS":   { Icon: ShoppingBag,     color: "#EC407A" },
+  TEMPLES:            { Icon: Landmark,        color: "#F4B400" },
+  RESTAURANTS:        { Icon: UtensilsCrossed, color: "#FF7043" },
+  ATTRACTIONS:        { Icon: Camera,          color: "#43A047" },
+  "PETROL PUMPS":     { Icon: Fuel,            color: "#f59e0b" },
+  "BUSINESS HUBS":    { Icon: Briefcase,       color: "#00897B" },
+  // ── New Lifestyle & Convenience Categories ────────────────────────────────
+  SUPERMARKETS:       { Icon: ShoppingCart,    color: "#0288D1" },
+  "FITNESS CENTERS":  { Icon: Dumbbell,        color: "#E91E63" },
+  PHARMACIES:         { Icon: Pill,            color: "#26A69A" },
+  CAFES:              { Icon: Coffee,          color: "#795548" },
+  "BANKS & ATMs":     { Icon: Banknote,        color: "#558B2F" },
+  ENTERTAINMENT:      { Icon: Clapperboard,    color: "#8E24AA" },
 };
 
 export function resolvePoiMeta(type: string, types?: string[]): { Icon: typeof MapPin; color: string } {

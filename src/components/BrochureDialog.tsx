@@ -105,7 +105,7 @@ function generateHighlights(pois: BrochurePOI[]): string[] {
   const hasAttractionsOrPark = pois.some((p) => p.type === "ATTRACTIONS");
   if (hasAttractionsOrPark) out.push("Parks & Recreation nearby");
 
-  const hasHighway = pois.some((p) => ["PETROL PUMPS", "MAIN ROADS"].includes(p.type));
+  const hasHighway = pois.some((p) => ["PETROL PUMPS"].includes(p.type));
   if (hasHighway) out.push("Well connected to National Highway");
 
   if (out.length < 4) out.push("High appreciation potential in the area");
