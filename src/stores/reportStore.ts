@@ -23,6 +23,9 @@ interface ReportState {
   selectedPois: Record<string, SelectedPoiEntry[]>;
   /** Full data of the POI card currently being hovered (for temp map preview) */
   hoveredPoi: SelectedPoiEntry | null;
+  /** When true the analysis page auto-selects top 2 POIs per category, captures the map,
+   *  and opens the brochure dialog — showing a hybrid loading overlay during the flow. */
+  autoBrochureMode: boolean;
 
   setInputUrl: (v: string) => void;
   setCoordinates: (v: { lat: number; lng: number } | null) => void;
@@ -35,6 +38,7 @@ interface ReportState {
   /** Deselect all POIs for a given category */
   clearCategory: (categoryType: string) => void;
   setHoveredPoi: (poi: SelectedPoiEntry | null) => void;
+  setAutoBrochureMode: (v: boolean) => void;
   /** Wipe all analysis data (called when leaving the analysis page) */
   resetAnalysis: () => void;
 }
@@ -48,6 +52,7 @@ export const useReportStore = create<ReportState>((set) => ({
   mapProvider: "mapbox-v1",
   selectedPois: {},
   hoveredPoi: null,
+  autoBrochureMode: false,
 
   setInputUrl: (inputUrl) => set({ inputUrl }),
   setCoordinates: (coordinates) => set({ coordinates }),
@@ -55,6 +60,7 @@ export const useReportStore = create<ReportState>((set) => ({
   setLocationReport: (locationReport) => set({ locationReport }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setMapProvider: (mapProvider) => set({ mapProvider }),
+  setAutoBrochureMode: (autoBrochureMode) => set({ autoBrochureMode }),
 
   togglePoi: (poi) =>
     set((state) => {
@@ -85,5 +91,10 @@ export const useReportStore = create<ReportState>((set) => ({
       isGenerating: false,
       selectedPois: {},
       hoveredPoi: null,
+      // NOTE: autoBrochureMode is intentionally NOT reset here.
+      // resetAnalysis is called on analysis page unmount (including React StrictMode
+      // double-invoke), which would wipe the flag before the auto-flow can read it.
+      // autoBrochureMode is reset explicitly via setAutoBrochureMode(false) once the
+      // flow completes or is cancelled.
     }),
 }));

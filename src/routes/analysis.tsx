@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { motion, AnimatePresence } from "framer-motion";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { ArrowLeft, MapPin, Sparkles, Camera, Download, X, List, CircleDot } from "lucide-react";
+import { ArrowLeft, MapPin, Sparkles, Camera, Download, X, List, CircleDot, Map as MapIcon } from "lucide-react";
 import type { BrochurePOI } from "@/components/BrochureDialog";
 import { toPng } from "html-to-image";
 import { useReportStore } from "@/stores/reportStore";
@@ -58,13 +58,21 @@ function AnalysisPage() {
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
   const resetAnalysis = useReportStore((s) => s.resetAnalysis);
+  const autoBrochureMode = useReportStore((s) => s.autoBrochureMode);
+  const setAutoBrochureMode = useReportStore((s) => s.setAutoBrochureMode);
   const [isBrochureOpen, setIsBrochureOpen] = useState(false);
   const [capturedMapImageUrl, setCapturedMapImageUrl] = useState<string>("");
   const [isMapboxImageOpen, setIsMapboxImageOpen] = useState(false);
   const [isMapboxImageTopRightOpen, setIsMapboxImageTopRightOpen] = useState(false);
   const [isMapboxImageNoLabelsOpen, setIsMapboxImageNoLabelsOpen] = useState(false);
-  const [showDistanceRings, setShowDistanceRings] = useState(false);
+  const [showDistanceRings, setShowDistanceRings] = useState(true);
   const keys = useMapKeys();
+
+  // ── Auto-brochure loader step tracking ──────────────────────────────────────
+  // Steps: 0=loading data, 1=selecting POIs, 2=enabling rings, 3=capturing map, 4=preparing brochure
+  const [autoStep, setAutoStep] = useState(0);
+  // Guard: prevent the auto-select effect from running more than once per session
+  const autoPoisSelectedRef = useRef(false);
 
   usePlacesSearch();
 
@@ -79,6 +87,60 @@ function AnalysisPage() {
     };
   }, [resetAnalysis]);
 
+  // ── Auto-brochure: Step 1 → auto-select top 2 POIs per category ────────────
+  useEffect(() => {
+    if (!autoBrochureMode) return;
+    if (!locationReport || isGenerating) return;
+    if (autoPoisSelectedRef.current) return; // only run once
+    autoPoisSelectedRef.current = true;
+    setAutoStep(1); // "Selecting key POIs..."
+
+    // groupedPois is already sorted by quality score inside the memo below,
+    // but we can replicate the same logic here without depending on that memo.
+    locationReport.pois.forEach((group) => {
+      // Re-create the id formula used by allPois memo
+      const toRow = (it: typeof group.items[0]) => ({
+        id: `${group.type}|${it.name}|${it.lat.toFixed(5)}|${it.lng.toFixed(5)}`,
+        name: it.name,
+        type: group.type,
+        lat: it.lat,
+        lng: it.lng,
+        distanceKm: it.distanceKm,
+        types: it.types,
+      });
+
+      // Sort same way groupedPois does (score desc, then dist asc)
+      const sorted = [...group.items].sort((a, b) => {
+        const distA = Math.max(0.1, a.distanceKm);
+        const distB = Math.max(0.1, b.distanceKm);
+        const scoreA = ((a.rating || 0) * (a.userRatingCount || 0)) / distA;
+        const scoreB = ((b.rating || 0) * (b.userRatingCount || 0)) / distB;
+        const diff = scoreB - scoreA;
+        if (diff !== 0) return diff;
+        return a.distanceKm - b.distanceKm;
+      });
+
+      // Select top 2
+      sorted.slice(0, 2).forEach((it) => {
+        togglePoi(toRow(it));
+      });
+    });
+
+    // Step 2 → enable distance rings (short delay so markers settle on map)
+    setTimeout(() => {
+      setShowDistanceRings(true);
+      setAutoStep(2); // "Enabling distance rings..."
+    }, 600);
+
+    // Step 3 → open the capture dialog (give map time to render rings)
+    setTimeout(() => {
+      setAutoStep(3); // "Capturing map snapshot..."
+      setIsMapboxImageNoLabelsOpen(true);
+    }, 1400);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoBrochureMode, locationReport, isGenerating]);
+
+
   const serial = locationReport?.reportId.replace(/-/g, "").slice(0, 4).toUpperCase() ?? "----";
   const reportId = locationReport?.reportId ?? `VIC-2026-${serial}`;
 
@@ -91,9 +153,22 @@ function AnalysisPage() {
   }, [selectedPois]);
 
   const handleGenerateBrochure = (imageDataUrl: string) => {
+    setAutoStep(4); // "Preparing brochure..."
     setCapturedMapImageUrl(imageDataUrl);
-    setIsBrochureOpen(true);
+    setIsMapboxImageNoLabelsOpen(false); // Explicitly close the invisible map dialog
+    
+    if (autoBrochureMode) {
+      // Pause so the user can visibly see the final "Preparing brochure" step tick off
+      setTimeout(() => {
+        setIsBrochureOpen(true);
+        // Dismiss the auto loader smoothly
+        setTimeout(() => setAutoBrochureMode(false), 300);
+      }, 1500);
+    } else {
+      setIsBrochureOpen(true);
+    }
   };
+
 
   const allPois: PoiRow[] = useMemo(() => {
     if (!locationReport) return [];
@@ -358,7 +433,11 @@ function AnalysisPage() {
       {isMapboxImageNoLabelsOpen && (
         <MapboxImageDialog
           open={isMapboxImageNoLabelsOpen}
-          onClose={() => setIsMapboxImageNoLabelsOpen(false)}
+          onClose={() => {
+            setIsMapboxImageNoLabelsOpen(false);
+            // If user manually closes during auto-flow, cancel the flow
+            if (autoBrochureMode) setAutoBrochureMode(false);
+          }}
           lat={coordinates.lat}
           lng={coordinates.lng}
           token={keys?.mapboxToken}
@@ -366,7 +445,13 @@ function AnalysisPage() {
           labelsPosition="none"
           showDistanceRings={showDistanceRings}
           onGenerateBrochure={handleGenerateBrochure}
+          autoBrochureMode={autoBrochureMode}
         />
+      )}
+
+      {/* Auto-brochure animated loading overlay */}
+      {autoBrochureMode && (
+        <AutoBrochureLoader step={autoStep} isGenerating={isGenerating} />
       )}
 
       {/* ── PLACES LIST (directly below map) ── */}
@@ -593,7 +678,7 @@ const MAPBOX_PROVIDER_STYLES: Record<string, { url: string; staticId: string }> 
 // Flat 2D camera settings
 const CINEMATIC_PITCH = 0;
 const CINEMATIC_BEARING = 0;
-const CINEMATIC_ZOOM = 14;
+const CINEMATIC_ZOOM = 12;
 
 // Layer IDs to hide: business POIs, transit labels, dense icons
 const LAYERS_TO_HIDE = [
@@ -1196,15 +1281,20 @@ interface MapboxImageDialogProps {
   labelsPosition?: "on-marker" | "top-right" | "none";
   showDistanceRings?: boolean;
   onGenerateBrochure?: (imageDataUrl: string) => void;
+  /** When true the dialog will auto-trigger Generate Brochure once the map image has loaded */
+  autoBrochureMode?: boolean;
 }
 
-function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, labelsPosition = "on-marker", showDistanceRings, onGenerateBrochure }: MapboxImageDialogProps) {
+function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, labelsPosition = "on-marker", showDistanceRings, onGenerateBrochure, autoBrochureMode }: MapboxImageDialogProps) {
   const mapProvider = useReportStore((s) => s.mapProvider);
 
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCapturingBrochure, setIsCapturingBrochure] = useState(false);
+  // Guard so auto-trigger only fires once even if imgLoaded flickers
+  const autoTriggeredRef = useRef(false);
+
 
   const staticData = token
     ? buildStaticMapUrl({
@@ -1237,6 +1327,20 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
     return () => obs.disconnect();
   }, []);
 
+  // Auto-trigger brochure generation when image loads in auto-brochure mode
+  useEffect(() => {
+    if (!autoBrochureMode) return;
+    if (!imgLoaded) return;
+    if (autoTriggeredRef.current) return;
+    autoTriggeredRef.current = true;
+    // Small delay to ensure the map overlay renders (markers, rings) before capture
+    const timer = setTimeout(() => {
+      handleGenerateBrochure();
+    }, 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoBrochureMode, imgLoaded]);
+
   const handleDownload = async () => {
     if (!mapContainerRef.current) return;
     setIsDownloading(true);
@@ -1262,7 +1366,9 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
       const mapEl = mapContainerRef.current ?? captureRef.current;
       const dataUrl = await toPng(mapEl, { cacheBust: true, pixelRatio: 2 });
       onGenerateBrochure(dataUrl);
-      onClose();
+      if (!autoBrochureMode) {
+        onClose();
+      }
     } catch (e) {
       console.error("Brochure capture failed:", e);
     } finally {
@@ -1277,14 +1383,16 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
       {open && (
         <>
           {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm"
-            onClick={onClose}
-          />
+          {!autoBrochureMode && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm"
+              onClick={onClose}
+            />
+          )}
 
           {/* Dialog */}
           <motion.div
@@ -1292,7 +1400,7 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.93, y: 20 }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
+            className={`fixed inset-0 flex items-center justify-center p-4 pointer-events-none ${autoBrochureMode ? "-z-[50]" : "z-[201]"}`}
           >
             <div
               ref={captureRef}
@@ -1594,6 +1702,144 @@ function MapboxImageDialog({ open, onClose, lat, lng, token, selectedPois, label
           </motion.div>
         </>
       )}
+    </AnimatePresence>
+  );
+}
+
+// ── Auto-Brochure Hybrid Loading Overlay ─────────────────────────────────────
+
+const AUTO_BROCHURE_STEPS = [
+  { label: "Loading vicinity data", Icon: MapIcon },
+  { label: "Selecting key POIs", Icon: MapPin },
+  { label: "Enabling distance rings", Icon: CircleDot },
+  { label: "Capturing map snapshot", Icon: Camera },
+  { label: "Preparing brochure", Icon: Sparkles },
+];
+
+function AutoBrochureLoader({ step, isGenerating }: { step: number; isGenerating: boolean }) {
+  // Derive displayed step — if still generating, clamp at 0 (Loading data)
+  const displayStep = isGenerating ? 0 : step;
+  const ActiveIcon = AUTO_BROCHURE_STEPS[displayStep]?.Icon ?? Sparkles;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="auto-brochure-loader"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 z-[150] flex items-center justify-center font-body bg-black/70 backdrop-blur-sm"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col items-center gap-8 bg-white/5 border border-white/10 rounded-3xl p-10 shadow-2xl"
+          style={{ minWidth: 340 }}
+        >
+          {/* Pulsing gold ring */}
+          <div className="relative w-20 h-20 flex items-center justify-center">
+            <div
+              className="absolute inset-0 rounded-full animate-ping"
+              style={{ background: "rgba(200, 185, 126, 0.15)" }}
+            />
+            <div
+              className="w-20 h-20 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: "rgba(200, 185, 126, 0.2)", borderTopColor: "var(--gold)" }}
+            />
+            <ActiveIcon className="absolute text-[var(--gold)] w-7 h-7" />
+          </div>
+
+          {/* Title */}
+          <div className="text-center">
+            <div
+              className="text-[10px] tracking-[0.25em] uppercase font-bold mb-2"
+              style={{ color: "var(--gold)" }}
+            >
+              Vicinity Intelligence
+            </div>
+            <motion.h2
+              key={displayStep}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-white text-xl font-heading font-semibold"
+            >
+              {AUTO_BROCHURE_STEPS[displayStep]?.label}…
+            </motion.h2>
+          </div>
+
+          {/* Step indicators */}
+          <div className="flex flex-col gap-3.5 w-full">
+            {AUTO_BROCHURE_STEPS.map((s, i) => {
+              const done = i < displayStep;
+              const active = i === displayStep;
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.08 }}
+                  className="flex items-center gap-4"
+                >
+                  {/* Status dot */}
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-500"
+                    style={{
+                      background: done
+                        ? "var(--gold)"
+                        : active
+                        ? "rgba(200, 185, 126, 0.15)"
+                        : "rgba(255, 255, 255, 0.05)",
+                      border: active
+                        ? "1.5px solid var(--gold)"
+                        : done
+                        ? "none"
+                        : "1px solid rgba(255, 255, 255, 0.15)",
+                    }}
+                  >
+                    {done ? (
+                      <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                        <path
+                          d="M1 5L4.5 8L11 1"
+                          stroke="var(--navy)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : active ? (
+                      <div
+                        className="w-2 h-2 rounded-full animate-pulse"
+                        style={{ background: "var(--gold)" }}
+                      />
+                    ) : null}
+                  </div>
+
+                  {/* Label */}
+                  <span
+                    className="text-sm font-medium transition-all duration-300"
+                    style={{
+                      color: done
+                        ? "var(--gold)"
+                        : active
+                        ? "white"
+                        : "rgba(255, 255, 255, 0.4)",
+                    }}
+                  >
+                    {s.label}
+                  </span>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Subtitle hint */}
+          <p className="text-xs tracking-wide text-center text-white/30 mt-2">
+            Preparing your professional brochure
+          </p>
+        </motion.div>
+      </motion.div>
     </AnimatePresence>
   );
 }

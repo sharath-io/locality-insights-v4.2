@@ -248,7 +248,8 @@ export function BrochureDialog({
     if (!containerRef.current) return;
     const obs = new ResizeObserver(() => {
       if (!containerRef.current) return;
-      const { width, height } = containerRef.current.getBoundingClientRect();
+      const width = containerRef.current.offsetWidth;
+      const height = containerRef.current.offsetHeight;
       if (template.id === "a4") {
         // Two A4 pages side by side: fit both into the container
         const pageGap = 24; // gap between the two pages
@@ -265,7 +266,7 @@ export function BrochureDialog({
     });
     obs.observe(containerRef.current);
     return () => obs.disconnect();
-  }, [template]);
+  }, [template, isOpen]);
 
   // Body scroll lock
   useEffect(() => {
@@ -362,14 +363,7 @@ export function BrochureDialog({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-          style={{
-            position: "fixed", inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            backdropFilter: "blur(8px)",
-            zIndex: 9999,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "16px",
-          }}
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.97, y: 12 }}
