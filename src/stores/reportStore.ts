@@ -49,7 +49,7 @@ export const useReportStore = create<ReportState>((set) => ({
   selectedCategories: [],
   locationReport: null,
   isGenerating: false,
-  mapProvider: "mapbox-v1",
+  mapProvider: "mapbox-v2",
   selectedPois: {},
   hoveredPoi: null,
   autoBrochureMode: false,

@@ -109,8 +109,8 @@ function AnalysisPage() {
         types: it.types,
       });
 
-      // Sort same way groupedPois does (score desc, then dist asc)
-      const sorted = [...group.items].sort((a, b) => {
+      // Sort by score desc, then dist asc
+      const sortedByScore = [...group.items].sort((a, b) => {
         const distA = Math.max(0.1, a.distanceKm);
         const distB = Math.max(0.1, b.distanceKm);
         const scoreA = ((a.rating || 0) * (a.userRatingCount || 0)) / distA;
@@ -120,10 +120,21 @@ function AnalysisPage() {
         return a.distanceKm - b.distanceKm;
       });
 
-      // Select top 2
-      sorted.slice(0, 2).forEach((it) => {
-        togglePoi(toRow(it));
-      });
+      // Only consider the top 5 POIs that actually get rendered in the UI list
+      const top5 = sortedByScore.slice(0, 5);
+
+      if (top5.length > 0) {
+        // 1. First choice: The absolute best POI based on the custom score formula
+        const bestPoi = top5[0];
+        togglePoi(toRow(bestPoi));
+
+        if (top5.length > 1) {
+          // 2. Second choice: The nearest POI from the remaining items IN THE TOP 5
+          const remaining = top5.slice(1);
+          const nearestPoi = remaining.sort((a, b) => a.distanceKm - b.distanceKm)[0];
+          togglePoi(toRow(nearestPoi));
+        }
+      }
     });
 
     // Step 2 → enable distance rings (short delay so markers settle on map)
@@ -850,7 +861,7 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
   useEffect(() => {
     if (!token || !containerRef.current) return;
     mapboxgl.accessToken = token;
-    const styleUrl = MAPBOX_PROVIDER_STYLES[mapProvider]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v1"].url;
+    const styleUrl = MAPBOX_PROVIDER_STYLES[mapProvider]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v2"].url;
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: styleUrl,
@@ -906,29 +917,6 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
       } catch {
         /* ignore if layers not ready */
       }
-      // Re-add distance rings if they were visible before the style switch
-      if (showDistanceRingsRef.current) {
-        const center: [number, number] = [lng, lat];
-        RING_DISTANCES_KM.forEach((km, i) => {
-          const srcId = `ring-src-${km}`;
-          const fillId = `ring-fill-${km}`;
-          const strokeId = `ring-stroke-${km}`;
-          const labelId = `ring-label-${km}`;
-          const labelSrcId = `ring-label-src-${km}`;
-          if (map.getLayer(labelId)) map.removeLayer(labelId);
-          if (map.getLayer(strokeId)) map.removeLayer(strokeId);
-          if (map.getLayer(fillId)) map.removeLayer(fillId);
-          if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
-          if (map.getSource(srcId)) map.removeSource(srcId);
-          const circle = turf.circle(center, km, { units: "kilometers", steps: 64 });
-          map.addSource(srcId, { type: "geojson", data: circle });
-          map.addLayer({ id: fillId, type: "fill", source: srcId, paint: { "fill-color": RING_COLOR, "fill-opacity": 0.02 * (RING_DISTANCES_KM.length - i) } });
-          map.addLayer({ id: strokeId, type: "line", source: srcId, paint: { "line-color": RING_COLOR, "line-width": 1, "line-dasharray": [4, 3], "line-opacity": 0.6 } });
-          const labelPoint = turf.destination(center, km, 0, { units: "kilometers" });
-          map.addSource(labelSrcId, { type: "geojson", data: labelPoint });
-          map.addLayer({ id: labelId, type: "symbol", source: labelSrcId, layout: { "text-field": `${km} km`, "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"], "text-size": 11, "text-anchor": "bottom", "text-offset": [0, -0.5] }, paint: { "text-color": RING_COLOR, "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.5 } });
-        });
-      }
     };
 
     // 'style.load' fires exactly once on initial map load AND once after every
@@ -948,7 +936,7 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
   // Update map style when provider changes without re-initializing the map
   useEffect(() => {
     if (!mapRef.current) return;
-    const styleUrl = MAPBOX_PROVIDER_STYLES[provider]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v1"].url;
+    const styleUrl = MAPBOX_PROVIDER_STYLES[provider]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v2"].url;
     mapRef.current.setStyle(styleUrl);
   }, [provider]);
 
@@ -1088,89 +1076,102 @@ function MapboxMap({ lat, lng, token, showDistanceRings, provider }: { lat: numb
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (!map.isStyleLoaded()) return;
 
-    const center: [number, number] = [lng, lat];
+    const renderRings = () => {
+      if (!map.isStyleLoaded()) return;
 
-    if (showDistanceRings) {
-      RING_DISTANCES_KM.forEach((km, i) => {
-        const srcId = `ring-src-${km}`;
-        const fillId = `ring-fill-${km}`;
-        const strokeId = `ring-stroke-${km}`;
-        const labelId = `ring-label-${km}`;
+      const center: [number, number] = [lng, lat];
 
-        // Remove any existing layers/sources first
-        if (map.getLayer(labelId)) map.removeLayer(labelId);
-        if (map.getLayer(strokeId)) map.removeLayer(strokeId);
-        if (map.getLayer(fillId)) map.removeLayer(fillId);
-        if (map.getSource(srcId)) map.removeSource(srcId);
+      if (showDistanceRings) {
+        RING_DISTANCES_KM.forEach((km, i) => {
+          const srcId = `ring-src-${km}`;
+          const fillId = `ring-fill-${km}`;
+          const strokeId = `ring-stroke-${km}`;
+          const labelId = `ring-label-${km}`;
 
-        const circle = turf.circle(center, km, { units: "kilometers", steps: 64 });
-        map.addSource(srcId, { type: "geojson", data: circle });
+          // Remove any existing layers/sources first
+          if (map.getLayer(labelId)) map.removeLayer(labelId);
+          if (map.getLayer(strokeId)) map.removeLayer(strokeId);
+          if (map.getLayer(fillId)) map.removeLayer(fillId);
+          if (map.getSource(srcId)) map.removeSource(srcId);
 
-        // Subtle fill band — inner rings slightly darker
-        map.addLayer({
-          id: fillId,
-          type: "fill",
-          source: srcId,
-          paint: {
-            "fill-color": RING_COLOR,
-            "fill-opacity": 0.02 * (RING_DISTANCES_KM.length - i),
-          },
+          const circle = turf.circle(center, km, { units: "kilometers", steps: 64 });
+          map.addSource(srcId, { type: "geojson", data: circle });
+
+          // Subtle fill band — inner rings slightly darker
+          map.addLayer({
+            id: fillId,
+            type: "fill",
+            source: srcId,
+            paint: {
+              "fill-color": RING_COLOR,
+              "fill-opacity": 0.02 * (RING_DISTANCES_KM.length - i),
+            },
+          });
+
+          // Dashed stroke
+          map.addLayer({
+            id: strokeId,
+            type: "line",
+            source: srcId,
+            paint: {
+              "line-color": RING_COLOR,
+              "line-width": 1,
+              "line-dasharray": [4, 3],
+              "line-opacity": 0.6,
+            },
+          });
+
+          // Distance label — a symbol layer placed at top of the circle
+          const labelPoint = turf.destination(center, km, 0, { units: "kilometers" });
+          const labelSrcId = `ring-label-src-${km}`;
+          if (map.getLayer(labelId)) map.removeLayer(labelId);
+          if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
+          map.addSource(labelSrcId, { type: "geojson", data: labelPoint });
+          map.addLayer({
+            id: labelId,
+            type: "symbol",
+            source: labelSrcId,
+            layout: {
+              "text-field": `${km} km`,
+              "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+              "text-size": 11,
+              "text-anchor": "bottom",
+              "text-offset": [0, -0.5],
+            },
+            paint: {
+              "text-color": RING_COLOR,
+              "text-halo-color": "rgba(255,255,255,0.9)",
+              "text-halo-width": 1.5,
+            },
+          });
         });
-
-        // Dashed stroke
-        map.addLayer({
-          id: strokeId,
-          type: "line",
-          source: srcId,
-          paint: {
-            "line-color": RING_COLOR,
-            "line-width": 1,
-            "line-dasharray": [4, 3],
-            "line-opacity": 0.6,
-          },
+      } else {
+        // Remove rings + labels if toggled off
+        RING_DISTANCES_KM.forEach((km) => {
+          const srcId = `ring-src-${km}`;
+          const fillId = `ring-fill-${km}`;
+          const strokeId = `ring-stroke-${km}`;
+          const labelId = `ring-label-${km}`;
+          const labelSrcId = `ring-label-src-${km}`;
+          if (map.getLayer(labelId)) map.removeLayer(labelId);
+          if (map.getLayer(strokeId)) map.removeLayer(strokeId);
+          if (map.getLayer(fillId)) map.removeLayer(fillId);
+          if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
+          if (map.getSource(srcId)) map.removeSource(srcId);
         });
+      }
+    };
 
-        // Distance label — a symbol layer placed at top of the circle
-        const labelPoint = turf.destination(center, km, 0, { units: "kilometers" });
-        const labelSrcId = `ring-label-src-${km}`;
-        if (map.getLayer(labelId)) map.removeLayer(labelId);
-        if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
-        map.addSource(labelSrcId, { type: "geojson", data: labelPoint });
-        map.addLayer({
-          id: labelId,
-          type: "symbol",
-          source: labelSrcId,
-          layout: {
-            "text-field": `${km} km`,
-            "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
-            "text-size": 11,
-            "text-anchor": "bottom",
-            "text-offset": [0, -0.5],
-          },
-          paint: {
-            "text-color": RING_COLOR,
-            "text-halo-color": "rgba(255,255,255,0.9)",
-            "text-halo-width": 1.5,
-          },
-        });
-      });
-    } else {
-      // Remove rings + labels if toggled off
-      RING_DISTANCES_KM.forEach((km) => {
-        const srcId = `ring-src-${km}`;
-        const fillId = `ring-fill-${km}`;
-        const strokeId = `ring-stroke-${km}`;
-        const labelId = `ring-label-${km}`;
-        const labelSrcId = `ring-label-src-${km}`;
-        if (map.getLayer(labelId)) map.removeLayer(labelId);
-        if (map.getLayer(strokeId)) map.removeLayer(strokeId);
-        if (map.getLayer(fillId)) map.removeLayer(fillId);
-        if (map.getSource(labelSrcId)) map.removeSource(labelSrcId);
-        if (map.getSource(srcId)) map.removeSource(srcId);
-      });
-    }
+    // Attempt to render immediately
+    renderRings();
+
+    // Also attach a listener so it correctly re-renders if the style is re-loaded
+    map.on("style.load", renderRings);
+
+    return () => {
+      map.off("style.load", renderRings);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDistanceRings, lat, lng]);
 
@@ -1241,7 +1242,7 @@ function buildStaticMapUrl(opts: {
 }): { url: string, zoom: number } {
   const { token, lng, lat, mapProvider, selectedPois, width = 1200, height = 700, showDistanceRings } = opts;
 
-  const staticStyle = MAPBOX_PROVIDER_STYLES[mapProvider]?.staticId ?? MAPBOX_PROVIDER_STYLES["mapbox-v1"].staticId;
+  const staticStyle = MAPBOX_PROVIDER_STYLES[mapProvider]?.staticId ?? MAPBOX_PROVIDER_STYLES["mapbox-v2"].staticId;
   const overlays: string[] = [];
   overlays.push(`pin-l+e53935(${lng.toFixed(6)},${lat.toFixed(6)})`);
 
