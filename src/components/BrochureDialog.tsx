@@ -22,6 +22,7 @@ import {
   BadgeCheck,
   LayoutGrid,
   FileImage,
+  Route,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { CATEGORY_META } from "@/lib/map-styles";
@@ -90,28 +91,60 @@ const DEF_POIS: BrochurePOI[] = [
   { name: "Tenneti Park",         type: "ATTRACTIONS", distanceKm: 3.8 },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Overpass highway helper ───────────────────────────────────────────────────
 
-function generateHighlights(pois: BrochurePOI[]): string[] {
-  const out: string[] = [];
-  const hasAttraction = pois.some((p) =>
-    p.type === "ATTRACTIONS" ||
-    p.name.toLowerCase().includes("beach")
-  );
-  if (hasAttraction) out.push("Beach & Tourist attractions close by");
+type HighwayInfo = { ref: string; name: string; distanceKm: number };
 
-  const hospital = pois.find((p) => p.type === "HOSPITALS");
-  if (hospital) out.push(`Hospitals within ${Math.ceil(hospital.distanceKm + 0.5)} km radius`);
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
-  const hasAttractionsOrPark = pois.some((p) => p.type === "ATTRACTIONS");
-  if (hasAttractionsOrPark) out.push("Parks & Recreation nearby");
-
-  const hasHighway = pois.some((p) => ["PETROL PUMPS"].includes(p.type));
-  if (hasHighway) out.push("Well connected to National Highway");
-
-  if (out.length < 4) out.push("High appreciation potential in the area");
-
-  return out.slice(0, 4);
+async function fetchNearestHighways(lat: number, lng: number): Promise<HighwayInfo[]> {
+  // Query Overpass for trunk/motorway/primary roads with a ref tag within 25km
+  const query = `
+[out:json][timeout:15];
+(
+  way["highway"~"^(motorway|trunk)$"]["ref"](around:25000,${lat},${lng});
+);
+out center;
+`;
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as { elements: Array<{ tags?: { ref?: string; name?: string }; center?: { lat: number; lon: number } }> };
+    
+    const highwaysMap = new Map<string, HighwayInfo>();
+    for (const el of json.elements) {
+      if (!el.center || !el.tags?.ref) continue;
+      const dist = haversineKm(lat, lng, el.center.lat, el.center.lon);
+      const ref = el.tags.ref;
+      
+      if (!highwaysMap.has(ref) || dist < highwaysMap.get(ref)!.distanceKm) {
+        highwaysMap.set(ref, {
+          ref,
+          name: el.tags.name ?? ref,
+          distanceKm: +dist.toFixed(1),
+        });
+      }
+    }
+    
+    return Array.from(highwaysMap.values())
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
 }
 
 // ── Google Font injection ─────────────────────────────────────────────────────
@@ -205,7 +238,18 @@ export function BrochureDialog({
     [nearbyPOIs]
   );
   const sortedPois = useMemo(() => [...pois].sort((a, b) => a.distanceKm - b.distanceKm), [pois]);
-  const highlights = useMemo(() => generateHighlights(sortedPois), [sortedPois]);
+  // ── Nearest highway (Overpass API) ─────────────────────────────────────────
+  const [highwayInfo, setHighwayInfo] = useState<HighwayInfo[]>([]);
+  const [highwayLoading, setHighwayLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setHighwayLoading(true);
+    fetchNearestHighways(coords.lat, coords.lng).then((info) => {
+      setHighwayInfo(info);
+      setHighwayLoading(false);
+    });
+  }, [isOpen, coords.lat, coords.lng]);
 
   // ── Editable state ────────────────────────────────────────────────────────
   const [title, setTitle]               = useState(propertyDetails?.title       ?? "Prime Land for Investment");
@@ -224,6 +268,7 @@ export function BrochureDialog({
   // ── Color customization ───────────────────────────────────────────────────
   const [accentColor, setAccentColor] = useState("#FFDE59");
   const [headerBg, setHeaderBg]       = useState("#fdfcf5");
+  const [textColor, setTextColor]     = useState("#1a1814");
 
   // ── Format selection ──────────────────────────────────────────────────────
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("instagram-square");
@@ -414,7 +459,7 @@ export function BrochureDialog({
                 }}>
                   <FileImage size={16} color="#5a5248" />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1814", letterSpacing: "-0.015em" }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: textColor, letterSpacing: "-0.015em" }}>
                   Brochure Generator
                 </span>
               </div>
@@ -483,12 +528,12 @@ export function BrochureDialog({
                   }}
                 >
                   {template.id === "whatsapp" && (
-                    <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fbf8ef", padding: "48px 48px 24px", boxSizing: "border-box", gap: 16 }}>
+                    <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", background: headerBg, padding: "48px 48px 24px", boxSizing: "border-box", gap: 16 }}>
                       
                       {/* Premium badge */}
                       <div style={{
                         position: "absolute", top: 0, left: 0, zIndex: 10,
-                        background: accentColor, borderRadius: "0 0 20px 0", padding: "12px 24px",
+                        background: "#FFDE59", borderRadius: "0 0 20px 0", padding: "12px 24px",
                         fontSize: 16, fontWeight: 800, color: "#1a1814",
                         letterSpacing: "0.12em", textTransform: "uppercase",
                         display: "flex", alignItems: "center", gap: 8
@@ -500,7 +545,7 @@ export function BrochureDialog({
                       {/* 1. Header (Top) */}
                       <div style={{ flexShrink: 0 }}>
                         {/* Title */}
-                        <div style={{ fontSize: 72, fontWeight: 900, color: "#1a1814", lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 12 }}>
+                        <div style={{ fontSize: 72, fontWeight: 900, color: textColor, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 12 }}>
                           {title}
                         </div>
 
@@ -509,7 +554,7 @@ export function BrochureDialog({
                           display: "inline-flex", alignItems: "center", gap: 10,
                           background: "white", borderRadius: 20, padding: "12px 24px",
                           border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-                          fontSize: 22, fontWeight: 700, color: "#1a1814"
+                          fontSize: 22, fontWeight: 700, color: textColor
                         }}>
                           <MapPin size={24} color={accentColor} />
                           {subtitle}
@@ -536,7 +581,7 @@ export function BrochureDialog({
                             background: "rgba(255,255,255,0.92)",
                             backdropFilter: "blur(8px)",
                             borderRadius: 12, padding: "8px 16px",
-                            fontSize: 18, fontWeight: 700, color: "#1a1814",
+                            fontSize: 18, fontWeight: 700, color: textColor,
                             fontFamily: "monospace",
                             boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
                             pointerEvents: "none",
@@ -565,7 +610,7 @@ export function BrochureDialog({
                             <div style={{ fontSize: 16, color: "#5a5248", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                               {label}
                             </div>
-                            <div style={{ fontSize: 36, fontWeight: 900, color: "#1a1814", lineHeight: 1.1 }}>
+                            <div style={{ fontSize: 36, fontWeight: 900, color: textColor, lineHeight: 1.1 }}>
                               {value}
                             </div>
                           </div>
@@ -576,7 +621,7 @@ export function BrochureDialog({
                       <div style={{ flexShrink: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, paddingLeft: 8 }}>
                           <MapPin size={24} color="#1a1814" />
-                          <div style={{ fontSize: 18, fontWeight: 900, color: "#1a1814", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                          <div style={{ fontSize: 18, fontWeight: 900, color: textColor, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                             NEARBY HIGHLIGHTS
                           </div>
                         </div>
@@ -598,7 +643,7 @@ export function BrochureDialog({
                                   }}>
                                     <Icon size={22} color={meta.color} />
                                   </div>
-                                  <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1814" }}>
+                                  <div style={{ fontSize: 24, fontWeight: 700, color: textColor }}>
                                     {poi.name}
                                   </div>
                                 </div>
@@ -624,17 +669,17 @@ export function BrochureDialog({
                         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
                           <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 100, height: 100, borderRadius: "50%", objectFit: "cover", border: "4px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.1)" }} />
                           <div>
-                            <div style={{ fontSize: 32, fontWeight: 900, color: "#1a1814", marginBottom: 6 }}>{agentName}</div>
+                            <div style={{ fontSize: 32, fontWeight: 900, color: textColor, marginBottom: 6 }}>{agentName}</div>
                             <div style={{ fontSize: 18, color: "#5a5248", marginBottom: 12 }}>{agentRole}</div>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <Phone size={20} color={accentColor} />
-                              <span style={{ fontSize: 22, fontWeight: 800, color: "#1a1814" }}>{agentPhone}</span>
+                              <span style={{ fontSize: 22, fontWeight: 800, color: textColor }}>{agentPhone}</span>
                             </div>
                           </div>
                         </div>
                         <div style={{ textAlign: "center", padding: "0 24px", borderLeft: "2px solid #ede8de", borderRight: "2px solid #ede8de" }}>
                           <div style={{ fontSize: 18, color: "#5a5248", marginBottom: 8, fontStyle: "italic" }}>Interested in this property?</div>
-                          <div style={{ fontSize: 56, fontFamily: "'Dancing Script', Georgia, cursive", color: "#1a1814", fontWeight: 700 }}>Let's Connect!</div>
+                          <div style={{ fontSize: 56, fontFamily: "'Dancing Script', Georgia, cursive", color: textColor, fontWeight: 700 }}>Let's Connect!</div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                           <div style={{ width: 120, height: 120, background: "white", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #ede8de", padding: 8 }}>
@@ -647,15 +692,15 @@ export function BrochureDialog({
                   )}
 
                   {template.id === "instagram-square" && (
-                    <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fbf8ef", overflow: "hidden" }}>
+                    <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", background: headerBg, overflow: "hidden" }}>
 
                       {/* Premium Badge Overlapping Top Left of Brochure */}
                       <div style={{
                         position: "absolute", top: 0, left: 0, zIndex: 10,
-                        background: accentColor, borderRadius: "0 0 16px 0", padding: "10px 24px",
+                        background: "#FFDE59", borderRadius: "0 0 16px 0", padding: "10px 24px",
                         fontSize: 14, fontWeight: 800, color: "#1a1814",
                         letterSpacing: "0.12em", textTransform: "uppercase",
-                        display: "flex", alignItems: "center", gap: 8,
+                        display: "flex", alignItems: "center", gap: 6,
                       }}>
                         <BadgeCheck size={18} />
                         PREMIUM PROPERTY
@@ -695,7 +740,7 @@ export function BrochureDialog({
                           background: "rgba(255,255,255,0.92)",
                           backdropFilter: "blur(8px)",
                           borderRadius: 10, padding: "6px 12px",
-                          fontSize: 14, fontWeight: 700, color: "#1a1814",
+                          fontSize: 14, fontWeight: 700, color: textColor,
                           fontFamily: "monospace",
                           boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
                           pointerEvents: "none",
@@ -712,7 +757,7 @@ export function BrochureDialog({
                           pointerEvents: "none" // Prevents capturing clicks meant for the map if any
                         }}>
                           <div style={{
-                            fontSize: 64, fontWeight: 900, color: "#1a1814",
+                            fontSize: 64, fontWeight: 900, color: textColor,
                             lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 12,
                             textShadow: "0 4px 20px rgba(255,255,255,0.9)"
                           }}>
@@ -724,7 +769,7 @@ export function BrochureDialog({
                             display: "inline-flex", alignItems: "center", gap: 10,
                             background: "white", borderRadius: 20, padding: "10px 20px",
                             border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-                            fontSize: 20, fontWeight: 700, color: "#1a1814"
+                            fontSize: 20, fontWeight: 700, color: textColor
                           }}>
                             <MapPin size={22} color={accentColor} />
                             {subtitle}
@@ -755,7 +800,7 @@ export function BrochureDialog({
                             <div style={{ fontSize: 12, color: "#5a5248", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                               {label}
                             </div>
-                            <div style={{ fontSize: 26, fontWeight: 900, color: "#1a1814", lineHeight: 1.1 }}>
+                            <div style={{ fontSize: 26, fontWeight: 900, color: textColor, lineHeight: 1.1 }}>
                               {value}
                             </div>
                           </div>
@@ -773,7 +818,7 @@ export function BrochureDialog({
                         {/* Full-width Title */}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
                           <MapPin size={20} color="#1a1814" />
-                          <div style={{ fontSize: 14, fontWeight: 900, color: "#1a1814", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                          <div style={{ fontSize: 14, fontWeight: 900, color: textColor, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                             NEARBY HIGHLIGHTS
                           </div>
                         </div>
@@ -812,7 +857,7 @@ export function BrochureDialog({
                                     }}>
                                       <Icon size={14} color={meta.color} />
                                     </div>
-                                    <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1814" }}>{poi.name}</span>
+                                    <span style={{ fontSize: 15, fontWeight: 700, color: textColor }}>{poi.name}</span>
                                   </div>
                                   <span style={{ fontSize: 14, fontWeight: 800, color: "#5a5248", whiteSpace: "nowrap" }}>
                                     {poi.distanceKm.toFixed(1)} km
@@ -851,7 +896,7 @@ export function BrochureDialog({
                                       }}>
                                         <Icon size={14} color={meta.color} />
                                       </div>
-                                      <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1814" }}>{poi.name}</span>
+                                      <span style={{ fontSize: 15, fontWeight: 700, color: textColor }}>{poi.name}</span>
                                     </div>
                                     <span style={{ fontSize: 14, fontWeight: 800, color: "#5a5248", whiteSpace: "nowrap" }}>
                                       {poi.distanceKm.toFixed(1)} km
@@ -892,13 +937,13 @@ export function BrochureDialog({
                                   }}
                                 />
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 20, fontWeight: 900, color: "#1a1814", marginBottom: 2 }}>{agentName}</div>
+                                  <div style={{ fontSize: 20, fontWeight: 900, color: textColor, marginBottom: 2 }}>{agentName}</div>
                                   <div style={{ fontSize: 13, color: "#5a5248", fontWeight: 600 }}>{agentRole}</div>
                                 </div>
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
                                 <Phone size={16} color={accentColor} />
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "#1a1814", letterSpacing: "0.02em" }}>{agentPhone}</span>
+                                <span style={{ fontSize: 16, fontWeight: 800, color: textColor, letterSpacing: "0.02em" }}>{agentPhone}</span>
                               </div>
                             </div>
 
@@ -915,7 +960,7 @@ export function BrochureDialog({
                               <div style={{
                                 fontSize: 26,
                                 fontFamily: "'Dancing Script', Georgia, cursive",
-                                color: "#1a1814", fontWeight: 700, lineHeight: 1.1,
+                                color: textColor, fontWeight: 700, lineHeight: 1.1,
                                 marginBottom: 10
                               }}>Let's Connect!</div>
                               <div style={{
@@ -937,15 +982,15 @@ export function BrochureDialog({
 
                   {/* ── INSTAGRAM PORTRAIT ──────────────────────────────── */}
                   {template.id === "instagram-portrait" && (
-                    <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#fbf8ef", overflow: "hidden" }}>
+                    <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", background: headerBg, overflow: "hidden" }}>
 
                       {/* Premium badge */}
                       <div style={{
                         position: "absolute", top: 0, left: 0, zIndex: 10,
-                        background: accentColor, borderRadius: "0 0 16px 0", padding: "10px 24px",
+                        background: "#FFDE59", borderRadius: "0 0 16px 0", padding: "10px 24px",
                         fontSize: 14, fontWeight: 800, color: "#1a1814",
                         letterSpacing: "0.12em", textTransform: "uppercase",
-                        display: "flex", alignItems: "center", gap: 8,
+                        display: "flex", alignItems: "center", gap: 6,
                       }}>
                         <BadgeCheck size={18} />
                         PREMIUM PROPERTY
@@ -986,7 +1031,7 @@ export function BrochureDialog({
                             background: "rgba(255,255,255,0.92)",
                             backdropFilter: "blur(8px)",
                             borderRadius: 10, padding: "6px 12px",
-                            fontSize: 14, fontWeight: 700, color: "#1a1814",
+                            fontSize: 14, fontWeight: 700, color: textColor,
                             fontFamily: "monospace",
                             boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
                             pointerEvents: "none",
@@ -1003,7 +1048,7 @@ export function BrochureDialog({
                             pointerEvents: "none"
                           }}>
                             <div style={{
-                              fontSize: 64, fontWeight: 900, color: "#1a1814",
+                              fontSize: 64, fontWeight: 900, color: textColor,
                               lineHeight: 1.05, letterSpacing: "-0.03em",
                               textShadow: "0 4px 20px rgba(255,255,255,0.9)"
                             }}>
@@ -1015,7 +1060,7 @@ export function BrochureDialog({
                               display: "inline-flex", alignItems: "center", gap: 10,
                               background: "white", borderRadius: 20, padding: "10px 20px",
                               border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-                              fontSize: 20, fontWeight: 700, color: "#1a1814"
+                              fontSize: 20, fontWeight: 700, color: textColor
                             }}>
                               <MapPin size={22} color={accentColor} />
                               {subtitle}
@@ -1034,14 +1079,14 @@ export function BrochureDialog({
                             flexDirection: "column",
                             padding: "20px 24px",
                             borderRight: "2px solid #ede8de",
-                            background: "#fbf8ef",
+                            background: headerBg,
                             overflow: "hidden",
                             gap: 12,
                           }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                               <MapPin size={20} color="#1a1814" />
                               <div style={{
-                                fontSize: 14, fontWeight: 900, color: "#1a1814", letterSpacing: "0.1em", textTransform: "uppercase"
+                                fontSize: 14, fontWeight: 900, color: textColor, letterSpacing: "0.1em", textTransform: "uppercase"
                               }}>
                                 NEARBY HIGHLIGHTS
                               </div>
@@ -1068,7 +1113,7 @@ export function BrochureDialog({
                                       }}>
                                         <Icon size={16} color={meta.color} />
                                       </div>
-                                      <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1814" }}>{poi.name}</span>
+                                      <span style={{ fontSize: 15, fontWeight: 700, color: textColor }}>{poi.name}</span>
                                     </div>
                                     <span style={{
                                       fontSize: 14, fontWeight: 800, color: "#5a5248",
@@ -1089,7 +1134,7 @@ export function BrochureDialog({
                             display: "flex",
                             flexDirection: "column",
                             padding: "20px 24px",
-                            background: "#fbf8ef",
+                            background: headerBg,
                             overflow: "hidden",
                             gap: 16,
                           }}>
@@ -1115,7 +1160,7 @@ export function BrochureDialog({
                                       {icon}
                                     </div>
                                   </div>
-                                  <div style={{ fontSize: 26, fontWeight: 900, color: "#1a1814", lineHeight: 1.1 }}>
+                                  <div style={{ fontSize: 26, fontWeight: 900, color: textColor, lineHeight: 1.1 }}>
                                     {value}
                                   </div>
                                   <div style={{ fontSize: 12, color: "#5a5248", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
@@ -1159,13 +1204,13 @@ export function BrochureDialog({
                                     }}
                                   />
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 20, fontWeight: 900, color: "#1a1814", marginBottom: 2 }}>{agentName}</div>
+                                    <div style={{ fontSize: 20, fontWeight: 900, color: textColor, marginBottom: 2 }}>{agentName}</div>
                                     <div style={{ fontSize: 13, color: "#5a5248", fontWeight: 600 }}>{agentRole}</div>
                                   </div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
                                   <Phone size={16} color={accentColor} />
-                                  <span style={{ fontSize: 16, fontWeight: 800, color: "#1a1814", letterSpacing: "0.02em" }}>{agentPhone}</span>
+                                  <span style={{ fontSize: 16, fontWeight: 800, color: textColor, letterSpacing: "0.02em" }}>{agentPhone}</span>
                                 </div>
                               </div>
 
@@ -1183,7 +1228,7 @@ export function BrochureDialog({
                                 <div style={{
                                   fontSize: 26,
                                   fontFamily: "'Dancing Script', Georgia, cursive",
-                                  color: "#1a1814", fontWeight: 700, lineHeight: 1.1,
+                                  color: textColor, fontWeight: 700, lineHeight: 1.1,
                                   marginBottom: 10
                                 }}>Let's Connect!</div>
                                 <div style={{
@@ -1210,17 +1255,17 @@ export function BrochureDialog({
                   )}
 
                   {template.id === "facebook" && (
-                    <div style={{ position: "relative", display: "flex", width: "100%", height: "100%", background: "#fbf8ef", overflow: "hidden" }}>
+                    <div style={{ position: "relative", display: "flex", width: "100%", height: "100%", background: headerBg, overflow: "hidden" }}>
                       {/* Left Column */}
-                      <div style={{ flex: "0 0 58%", display: "flex", flexDirection: "column", borderRight: "2px solid #ede8de", background: "#fbf8ef", position: "relative" }}>
+                      <div style={{ flex: "0 0 58%", display: "flex", flexDirection: "column", borderRight: "2px solid #ede8de", background: headerBg, position: "relative" }}>
                         
                         {/* Premium badge */}
                         <div style={{
                           position: "absolute", top: 0, left: 0, zIndex: 10,
-                          background: accentColor, borderRadius: "0 0 20px 0", padding: "10px 24px",
+                          background: "#FFDE59", borderRadius: "0 0 20px 0", padding: "10px 24px",
                           fontSize: 14, fontWeight: 800, color: "#1a1814",
                           letterSpacing: "0.12em", textTransform: "uppercase",
-                          display: "flex", alignItems: "center", gap: 8
+                          display: "flex", alignItems: "center", gap: 6
                         }}>
                           <BadgeCheck size={18} />
                           PREMIUM PROPERTY
@@ -1228,7 +1273,7 @@ export function BrochureDialog({
 
                         {/* Heading Part */}
                         <div style={{ flexShrink: 0, padding: "44px 32px 20px", display: "flex", flexDirection: "column" }}>
-                          <div style={{ fontSize: 46, fontWeight: 900, color: "#1a1814", lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 12 }}>
+                          <div style={{ fontSize: 46, fontWeight: 900, color: textColor, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 12 }}>
                             {title}
                           </div>
                           
@@ -1237,7 +1282,7 @@ export function BrochureDialog({
                             display: "inline-flex", alignItems: "center", gap: 8, alignSelf: "flex-start",
                             background: "white", borderRadius: 20, padding: "8px 16px",
                             border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-                            fontSize: 16, fontWeight: 700, color: "#1a1814"
+                            fontSize: 16, fontWeight: 700, color: textColor
                           }}>
                             <MapPin size={18} color={accentColor} />
                             {subtitle}
@@ -1257,7 +1302,7 @@ export function BrochureDialog({
                           <div style={{
                             position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.92)",
                             backdropFilter: "blur(8px)", borderRadius: 10, padding: "6px 12px",
-                            fontSize: 14, fontWeight: 700, color: "#1a1814", fontFamily: "monospace",
+                            fontSize: 14, fontWeight: 700, color: textColor, fontFamily: "monospace",
                             boxShadow: "0 4px 16px rgba(0,0,0,0.12)", pointerEvents: "none",
                           }}>
                             {coords.lat.toFixed(5)}° N, {coords.lng.toFixed(5)}° E
@@ -1266,7 +1311,7 @@ export function BrochureDialog({
                       </div>
 
                       {/* Right Column */}
-                      <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#fbf8ef", padding: "8px 20px 20px 20px", gap: 16 }}>
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", background: headerBg, padding: "8px 20px 20px 20px", gap: 16 }}>
                         {/* Data Metrics */}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, flexShrink: 0 }}>
                           {propCards.map(({ label, value, icon }) => (
@@ -1281,7 +1326,7 @@ export function BrochureDialog({
                                   {icon}
                                 </div>
                               </div>
-                              <div style={{ fontSize: 17, fontWeight: 900, color: "#1a1814", lineHeight: 1.1 }}>
+                              <div style={{ fontSize: 17, fontWeight: 900, color: textColor, lineHeight: 1.1 }}>
                                 {value}
                               </div>
                               <div style={{ fontSize: 9, color: "#5a5248", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
@@ -1295,7 +1340,7 @@ export function BrochureDialog({
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                             <MapPin size={16} color="#1a1814" />
-                            <div style={{ fontSize: 13, fontWeight: 900, color: "#1a1814", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                            <div style={{ fontSize: 13, fontWeight: 900, color: textColor, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                               Nearby Highlights
                             </div>
                           </div>
@@ -1313,7 +1358,7 @@ export function BrochureDialog({
                                     <div style={{ width: 28, height: 28, borderRadius: 8, background: `${meta.color}15`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                       <Icon size={14} color={meta.color} style={{ flexShrink: 0 }} />
                                     </div>
-                                    <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1814" }}>{poi.name}</span>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: textColor }}>{poi.name}</span>
                                   </div>
                                   <span style={{ fontSize: 13, fontWeight: 800, color: "#5a5248", whiteSpace: "nowrap" }}>
                                     {poi.distanceKm.toFixed(1)} km
@@ -1352,13 +1397,13 @@ export function BrochureDialog({
                                 }}
                               />
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: "#1a1814", marginBottom: 2 }}>{agentName}</div>
+                                <div style={{ fontSize: 18, fontWeight: 900, color: textColor, marginBottom: 2 }}>{agentName}</div>
                                 <div style={{ fontSize: 12, color: "#5a5248", fontWeight: 700 }}>{agentRole}</div>
                               </div>
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                               <Phone size={14} color={accentColor} />
-                              <span style={{ fontSize: 14, fontWeight: 800, color: "#1a1814" }}>{agentPhone}</span>
+                              <span style={{ fontSize: 14, fontWeight: 800, color: textColor }}>{agentPhone}</span>
                             </div>
                           </div>
 
@@ -1376,7 +1421,7 @@ export function BrochureDialog({
                             <div style={{
                               fontSize: 22,
                               fontFamily: "'Dancing Script', Georgia, cursive",
-                              color: "#1a1814", fontWeight: 700, lineHeight: 1.1,
+                              color: textColor, fontWeight: 700, lineHeight: 1.1,
                               marginBottom: 8
                             }}>Let's Connect!</div>
                             <div style={{
@@ -1397,12 +1442,12 @@ export function BrochureDialog({
                     <div style={{ position: "relative", display: "flex", flexDirection: "row", width: "100%", height: "100%", background: "#d6d1c9", boxSizing: "border-box", padding: "32px", gap: 24 }}>
 
                       {/* ── PAGE 1 — Left (Title + Map) ── */}
-                      <div style={{ flex: 1, minWidth: 0, height: 1690, display: "flex", flexDirection: "column", position: "relative", padding: "64px 52px 44px", boxSizing: "border-box", gap: 28, background: "#fbf8ef", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
+                      <div style={{ flex: 1, minWidth: 0, height: 1690, display: "flex", flexDirection: "column", position: "relative", padding: "64px 52px 44px", boxSizing: "border-box", gap: 28, background: headerBg, borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
                         {/* Premium badge */}
                         <div style={{
                           position: "absolute", top: 0, left: 0, zIndex: 10,
-                          background: accentColor, borderRadius: "0 0 24px 0", padding: "16px 32px",
-                          fontSize: 20, fontWeight: 800, color: "#1a1814",
+                          background: "#FFDE59", borderRadius: "0 0 24px 0", padding: "16px 32px",
+                          fontSize: 24, fontWeight: 800, color: "#1a1814",
                           letterSpacing: "0.12em", textTransform: "uppercase",
                           display: "flex", alignItems: "center", gap: 10
                         }}>
@@ -1412,14 +1457,14 @@ export function BrochureDialog({
 
                         {/* Title and Location */}
                         <div style={{ flexShrink: 0, paddingTop: 24 }}>
-                          <div style={{ fontSize: 80, fontWeight: 900, color: "#1a1814", lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
+                          <div style={{ fontSize: 80, fontWeight: 900, color: textColor, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
                             {title}
                           </div>
                           <div style={{
                             display: "inline-flex", alignItems: "center", gap: 14,
                             background: "white", borderRadius: 24, padding: "14px 24px",
                             border: "2px solid #ede8de", boxShadow: "0 6px 24px rgba(0,0,0,0.03)",
-                            fontSize: 24, fontWeight: 700, color: "#1a1814"
+                            fontSize: 24, fontWeight: 700, color: textColor
                           }}>
                             <MapPin size={28} color={accentColor} />
                             {subtitle}
@@ -1440,7 +1485,7 @@ export function BrochureDialog({
                             position: "absolute", top: 24, left: 24,
                             background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
                             borderRadius: 14, padding: "10px 20px",
-                            fontSize: 20, fontWeight: 700, color: "#1a1814", fontFamily: "monospace",
+                            fontSize: 20, fontWeight: 700, color: textColor, fontFamily: "monospace",
                             boxShadow: "0 6px 24px rgba(0,0,0,0.12)", pointerEvents: "none",
                           }}>
                             {coords.lat.toFixed(5)}° N, {coords.lng.toFixed(5)}° E
@@ -1455,17 +1500,17 @@ export function BrochureDialog({
                         }}>
                           <div style={{ textAlign: "center", marginBottom: 24, paddingBottom: 24, borderBottom: "2px solid #ede8de" }}>
                             <div style={{ fontSize: 22, color: "#5a5248", marginBottom: 4, fontStyle: "italic" }}>Interested in this property?</div>
-                            <div style={{ fontSize: 64, fontFamily: "'Dancing Script', Georgia, cursive", color: "#1a1814", fontWeight: 700, lineHeight: 1.1 }}>Let's Connect!</div>
+                            <div style={{ fontSize: 64, fontFamily: "'Dancing Script', Georgia, cursive", color: textColor, fontWeight: 700, lineHeight: 1.1 }}>Let's Connect!</div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 28 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
                               <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
                               <div>
-                                <div style={{ fontSize: 44, fontWeight: 900, color: "#1a1814", marginBottom: 8 }}>{agentName}</div>
+                                <div style={{ fontSize: 44, fontWeight: 900, color: textColor, marginBottom: 8 }}>{agentName}</div>
                                 <div style={{ fontSize: 24, color: "#5a5248", marginBottom: 16 }}>{agentRole}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   <Phone size={26} color={accentColor} />
-                                  <span style={{ fontSize: 28, fontWeight: 800, color: "#1a1814" }}>{agentPhone}</span>
+                                  <span style={{ fontSize: 28, fontWeight: 800, color: textColor }}>{agentPhone}</span>
                                 </div>
                               </div>
                             </div>
@@ -1481,12 +1526,12 @@ export function BrochureDialog({
                       </div>
 
                       {/* ── PAGE 2 — Right (Metrics + Highlights + Agent) ── */}
-                      <div style={{ flex: 1, height: 1690, display: "flex", flexDirection: "column", padding: "52px 52px 44px", boxSizing: "border-box", gap: 28, background: "#fbf8ef", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
+                      <div style={{ flex: 1, height: 1690, display: "flex", flexDirection: "column", padding: "52px 52px 44px", boxSizing: "border-box", gap: 28, background: headerBg, borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
 
                         {/* 1. Section label */}
                         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                           <MapPin size={26} color="#1a1814" />
-                          <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1814", letterSpacing: "0.15em", textTransform: "uppercase" }}>Property Details</div>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: textColor, letterSpacing: "0.15em", textTransform: "uppercase" }}>Property Details</div>
                         </div>
 
                         {/* 2. Property Stats — 2×2 grid with bigger fonts */}
@@ -1506,19 +1551,64 @@ export function BrochureDialog({
                               <div style={{ fontSize: 18, color: "#5a5248", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                                 {label}
                               </div>
-                              <div style={{ fontSize: 52, fontWeight: 900, color: "#1a1814", lineHeight: 1.05 }}>
+                              <div style={{ fontSize: 52, fontWeight: 900, color: textColor, lineHeight: 1.05 }}>
                                 {value}
                               </div>
                             </div>
                           ))}
                         </div>
 
-                        {/* 3. Nearby Highlights — single column list */}
+                        {/* 3. Highway Proximity — Overpass data */}
+                        {(highwayInfo.length > 0 || highwayLoading) && (
+                          <div style={{ flexShrink: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingLeft: 4 }}>
+                              <Route size={24} color="#d97706" />
+                              <div style={{ fontSize: 22, fontWeight: 900, color: textColor, letterSpacing: "0.15em", textTransform: "uppercase" }}>Highway Connectivity</div>
+                            </div>
+                            <div style={{
+                              background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+                              borderRadius: 24, padding: "28px 36px",
+                              border: "2px solid #f59e0b",
+                              boxShadow: "0 8px 32px rgba(245,158,11,0.15)",
+                              display: "flex", alignItems: "center", gap: 24
+                            }}>
+                              <div style={{
+                                width: 72, height: 72, borderRadius: 20,
+                                background: "#f59e0b",
+                                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
+                                alignSelf: highwayInfo.length > 1 ? "flex-start" : "center",
+                                marginTop: highwayInfo.length > 1 ? 8 : 0
+                              }}>
+                                <Route size={36} color="white" />
+                              </div>
+                              {highwayLoading ? (
+                                <div style={{ fontSize: 22, color: "#92400e", fontStyle: "italic" }}>Fetching highway data…</div>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                  {highwayInfo.map(hw => (
+                                    <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                      <span style={{ fontSize: 36, color: "#f59e0b", fontWeight: 900 }}>✦</span>
+                                      <span style={{ fontSize: 32, fontWeight: 900, color: "#78350f", letterSpacing: "-0.01em" }}>
+                                        {hw.ref}{" "}
+                                        <span style={{ fontWeight: 700, color: "#92400e" }}>National Highway</span>{" "}
+                                        <span style={{ fontWeight: 600, color: "#b45309" }}>within {hw.distanceKm} km</span>
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+
+                        {/* 4. Nearby Places — single column list */}
                         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, paddingLeft: 4 }}>
                             <MapPin size={26} color="#1a1814" />
-                            <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1814", letterSpacing: "0.15em", textTransform: "uppercase" }}>
-                              Nearby Highlights
+                            <div style={{ fontSize: 22, fontWeight: 900, color: textColor, letterSpacing: "0.15em", textTransform: "uppercase" }}>
+                              Nearby Places
                             </div>
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 14, overflow: "hidden" }}>
@@ -1539,7 +1629,7 @@ export function BrochureDialog({
                                     }}>
                                       <Icon size={28} color={meta.color} />
                                     </div>
-                                    <div style={{ fontSize: 26, fontWeight: 700, color: "#1a1814", lineHeight: 1.2 }}>
+                                    <div style={{ fontSize: 26, fontWeight: 700, color: textColor, lineHeight: 1.2 }}>
                                       {poi.name}
                                     </div>
                                   </div>
@@ -1560,17 +1650,17 @@ export function BrochureDialog({
                         }}>
                           <div style={{ textAlign: "center", marginBottom: 24, paddingBottom: 24, borderBottom: "2px solid #ede8de" }}>
                             <div style={{ fontSize: 22, color: "#5a5248", marginBottom: 4, fontStyle: "italic" }}>Interested in this property?</div>
-                            <div style={{ fontSize: 64, fontFamily: "'Dancing Script', Georgia, cursive", color: "#1a1814", fontWeight: 700, lineHeight: 1.1 }}>Let's Connect!</div>
+                            <div style={{ fontSize: 64, fontFamily: "'Dancing Script', Georgia, cursive", color: textColor, fontWeight: 700, lineHeight: 1.1 }}>Let's Connect!</div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 28 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
                               <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
                               <div>
-                                <div style={{ fontSize: 44, fontWeight: 900, color: "#1a1814", marginBottom: 8 }}>{agentName}</div>
+                                <div style={{ fontSize: 44, fontWeight: 900, color: textColor, marginBottom: 8 }}>{agentName}</div>
                                 <div style={{ fontSize: 24, color: "#5a5248", marginBottom: 16 }}>{agentRole}</div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   <Phone size={26} color={accentColor} />
-                                  <span style={{ fontSize: 28, fontWeight: 800, color: "#1a1814" }}>{agentPhone}</span>
+                                  <span style={{ fontSize: 28, fontWeight: 800, color: textColor }}>{agentPhone}</span>
                                 </div>
                               </div>
                             </div>
@@ -1602,7 +1692,7 @@ export function BrochureDialog({
                     {/* Premium badge */}
                     <div style={{
                       flexShrink: 0,
-                      background: accentColor,
+                      background: "#FFDE59",
                       borderRadius: 5,
                       padding: "4px 10px",
                       fontSize: 9,
@@ -1615,7 +1705,7 @@ export function BrochureDialog({
                       Premium Property
                     </div>
                     <div style={{
-                      fontSize: 30, fontWeight: 900, color: "#1a1814",
+                      fontSize: 30, fontWeight: 900, color: textColor,
                       lineHeight: 1.1, letterSpacing: "-0.03em",
                       flex: 1, minWidth: 0,
                     }}>
@@ -1665,7 +1755,7 @@ export function BrochureDialog({
                         background: "rgba(255,255,255,0.92)",
                         backdropFilter: "blur(4px)",
                         borderRadius: 6, padding: "4px 10px",
-                        fontSize: 10, fontWeight: 700, color: "#1a1814",
+                        fontSize: 10, fontWeight: 700, color: textColor,
                         fontFamily: "monospace",
                         boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
                         pointerEvents: "none",
@@ -1704,7 +1794,7 @@ export function BrochureDialog({
                                 {icon}
                               </div>
                             </div>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1814", lineHeight: 1.2 }}>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: textColor, lineHeight: 1.2 }}>
                               {value}
                             </div>
                             <div style={{ fontSize: 8.5, color: "#9e9689", fontWeight: 600, letterSpacing: "0.08em" }}>
@@ -1736,7 +1826,7 @@ export function BrochureDialog({
                               }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                   <Icon size={11} color={meta.color} style={{ flexShrink: 0 }} />
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1814" }}>{poi.name}</span>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: textColor }}>{poi.name}</span>
                                 </div>
                                 <span style={{
                                   fontSize: 10, fontWeight: 700, color: "#5a5248",
@@ -1778,7 +1868,7 @@ export function BrochureDialog({
                         }}
                       />
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1814", lineHeight: 1.2, marginBottom: 2 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: textColor, lineHeight: 1.2, marginBottom: 2 }}>
                           {agentName}
                         </div>
                         <div style={{ fontSize: 9, color: "#9e9689", marginBottom: 5 }}>{agentRole}</div>
@@ -1802,7 +1892,7 @@ export function BrochureDialog({
                       <div style={{
                         fontSize: 22,
                         fontFamily: "'Dancing Script', Georgia, cursive",
-                        color: "#1a1814",
+                        color: textColor,
                         fontWeight: 700,
                         lineHeight: 1.1,
                       }}>
@@ -1825,7 +1915,7 @@ export function BrochureDialog({
                         <QRBlock url={`https://locateiq.app/report/${reportId}`} size={60} />
                       </div>
                       <div>
-                        <div style={{ fontSize: 8.5, fontWeight: 700, color: "#1a1814", marginBottom: 1 }}>Scan to</div>
+                        <div style={{ fontSize: 8.5, fontWeight: 700, color: textColor, marginBottom: 1 }}>Scan to</div>
                         <div style={{ fontSize: 8, color: "#9e9689", lineHeight: 1.4 }}>Contact or<br />view full report</div>
                       </div>
                     </div>
@@ -1851,7 +1941,7 @@ export function BrochureDialog({
                   padding: "18px 18px 14px",
                   borderBottom: "1px solid #e8e3d8",
                 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1814", marginBottom: 2 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: textColor, marginBottom: 2 }}>
                     Template Studio
                   </div>
                   <div style={{ fontSize: 11, color: "#9e9689" }}>High-fidelity formats</div>
@@ -1958,8 +2048,8 @@ export function BrochureDialog({
                       }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                           {[
-                            { label: "Accent Color", value: accentColor, onChange: setAccentColor },
                             { label: "Background", value: headerBg, onChange: setHeaderBg },
+                          { label: "Text Color", value: textColor, onChange: setTextColor },
                           ].map(({ label, value, onChange }) => (
                             <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                               <span style={{ fontSize: 10.5, fontWeight: 600, color: "#5a5248" }}>{label}</span>
@@ -2003,7 +2093,7 @@ export function BrochureDialog({
                               style={{
                                 width: "100%", padding: "6px 8px", fontSize: 11,
                                 border: "1.5px solid #e8e3d8", borderRadius: 6,
-                                background: "#fafaf8", color: "#1a1814",
+                                background: "#fafaf8", color: textColor,
                                 outline: "none", fontFamily: "inherit",
                                 boxSizing: "border-box",
                               }}
@@ -2017,7 +2107,7 @@ export function BrochureDialog({
                         <div style={{ display: "flex", justifyContent: "center", margin: "12px 0 16px" }}>
                           <label style={{ position: "relative", cursor: "pointer", display: "inline-block" }}>
                             <img src={agentPhoto} alt="Agent" crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: "2px solid #ede8de" }} />
-                            <div style={{ position: "absolute", bottom: -2, right: -2, background: accentColor, width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid white", color: "#1a1814" }}>
+                            <div style={{ position: "absolute", bottom: -2, right: -2, background: accentColor, width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid white", color: textColor }}>
                               <FileImage size={12} />
                             </div>
                             <input
@@ -2055,7 +2145,7 @@ export function BrochureDialog({
                               style={{
                                 width: "100%", padding: "6px 8px", fontSize: 11,
                                 border: "1.5px solid #e8e3d8", borderRadius: 6,
-                                background: "#fafaf8", color: "#1a1814",
+                                background: "#fafaf8", color: textColor,
                                 outline: "none", fontFamily: "inherit",
                                 boxSizing: "border-box",
                               }}
@@ -2091,7 +2181,7 @@ export function BrochureDialog({
                       background: dlState.startsWith("done")
                         ? "linear-gradient(135deg,#22c55e,#16a34a)"
                         : `linear-gradient(135deg, ${accentColor}, #e5ba24)`,
-                      color: "#1a1814", cursor: dlState.startsWith("loading") ? "not-allowed" : "pointer",
+                      color: textColor, cursor: dlState.startsWith("loading") ? "not-allowed" : "pointer",
                       fontSize: 13, fontWeight: 700,
                       boxShadow: `0 4px 16px ${accentColor}55`,
                       opacity: dlState.startsWith("loading") ? 0.8 : 1,
