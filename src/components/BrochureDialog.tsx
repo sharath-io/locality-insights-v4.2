@@ -29,7 +29,7 @@ import { CATEGORY_META } from "@/lib/map-styles";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type TemplateId = "instagram-square" | "instagram-portrait" | "whatsapp" | "facebook" | "a4";
+type TemplateId = "instagram-square" | "instagram-portrait" | "whatsapp" | "facebook" | "a4" | "captured-image";
 
 interface TemplateOption {
   id: TemplateId;
@@ -47,6 +47,7 @@ const TEMPLATES: TemplateOption[] = [
   { id: "whatsapp",           label: "WhatsApp Status",    sub: "1080 × 1920", icon: <Smartphone size={14} />, pxW: 1080, pxH: 1920, accentColor: "#25d366" },
   { id: "facebook",           label: "Facebook Post",      sub: "1200 × 630",  icon: <Facebook size={14} />,  pxW: 1200, pxH: 630,  accentColor: "#1877f2" },
   { id: "a4",                 label: "A4 Print (PDF)",     sub: "2 Pages", icon: <FileText size={14} />,  pxW: 2480, pxH: 1754, accentColor: "#e53935" },
+  { id: "captured-image",     label: "Map Image",     sub: "Map Only", icon: <FileImage size={14} />, pxW: 1920, pxH: 1080, accentColor: "#6b7280" },
 ];
 
 export interface BrochurePOI {
@@ -194,11 +195,11 @@ const Spinner = ({ size = 14, color = "white" }: { size?: number; color?: string
 
 function TemplateThumbnail({ t, active }: { t: TemplateOption; active: boolean }) {
   const w =
-    t.id === "facebook" ? 34 :
+    t.id === "facebook" || t.id === "captured-image" ? 34 :
     t.id === "instagram-square" ? 20 :
     t.id === "whatsapp" || t.id === "a4" ? 13 : 16;
   const h =
-    t.id === "facebook" ? 18 :
+    t.id === "facebook" || t.id === "captured-image" ? 18 :
     t.id === "instagram-square" ? 20 :
     t.id === "whatsapp" ? 26 :
     t.id === "a4" ? 26 : 20;
@@ -1441,7 +1442,7 @@ export function BrochureDialog({
                   {template.id === "a4" && (
                     <div style={{ position: "relative", display: "flex", flexDirection: "row", width: "100%", height: "100%", background: "#d6d1c9", boxSizing: "border-box", padding: "32px", gap: 24 }}>
 
-                      {/* ── PAGE 1 — Left (Title + Map) ── */}
+                      {/* ── PAGE 1 — Left (Title + Map + Property Details) ── */}
                       <div style={{ flex: 1, minWidth: 0, height: 1690, display: "flex", flexDirection: "column", position: "relative", padding: "64px 52px 44px", boxSizing: "border-box", gap: 28, background: headerBg, borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
                         {/* Premium badge */}
                         <div style={{
@@ -1492,73 +1493,43 @@ export function BrochureDialog({
                           </div>
                         </div>
 
-                        {/* Agent Section — left page (identical to right page) */}
-                        <div style={{
-                          background: "#fffbf0", borderRadius: 28,
-                          border: `3px solid ${accentColor}`,
-                          padding: "36px 40px", flexShrink: 0
-                        }}>
-                          <div style={{ textAlign: "center", marginBottom: 24, paddingBottom: 24, borderBottom: "2px solid #ede8de" }}>
-                            <div style={{ fontSize: 22, color: "#5a5248", marginBottom: 4, fontStyle: "italic" }}>Interested in this property?</div>
-                            <div style={{ fontSize: 64, fontFamily: "'Dancing Script', Georgia, cursive", color: textColor, fontWeight: 700, lineHeight: 1.1 }}>Let's Connect!</div>
+                        {/* Property Details Section (Moved from Page 2) */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <MapPin size={26} color="#1a1814" />
+                            <div style={{ fontSize: 22, fontWeight: 900, color: textColor, letterSpacing: "0.15em", textTransform: "uppercase" }}>Property Details</div>
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 28 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-                              <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
-                              <div>
-                                <div style={{ fontSize: 44, fontWeight: 900, color: textColor, marginBottom: 8 }}>{agentName}</div>
-                                <div style={{ fontSize: 24, color: "#5a5248", marginBottom: 16 }}>{agentRole}</div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                  <Phone size={26} color={accentColor} />
-                                  <span style={{ fontSize: 28, fontWeight: 800, color: textColor }}>{agentPhone}</span>
+
+                          <div style={{
+                            display: "grid", gridTemplateColumns: "repeat(2, 1fr)",
+                            gap: 20
+                          }}>
+                            {propCards.map(({ label, value, icon }) => (
+                              <div key={label} style={{
+                                display: "flex", flexDirection: "column", gap: 8,
+                                padding: "28px 28px 24px", background: "white", borderRadius: 24, border: "2px solid #ede8de",
+                                boxShadow: "0 4px 20px rgba(0,0,0,0.03)"
+                              }}>
+                                <div style={{ transform: "scale(1.8)", transformOrigin: "left center", marginBottom: 10 }}>
+                                  {icon}
+                                </div>
+                                <div style={{ fontSize: 18, color: "#5a5248", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                                  {label}
+                                </div>
+                                <div style={{ fontSize: 52, fontWeight: 900, color: textColor, lineHeight: 1.05 }}>
+                                  {value}
                                 </div>
                               </div>
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                              <div style={{ width: 130, height: 130, background: "white", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #ede8de", padding: 8 }}>
-                                <QRBlock url={`https://locateiq.app/report/${reportId}`} size={114} />
-                              </div>
-                              <div style={{ fontSize: 17, color: "#5a5248", fontWeight: 700 }}>Scan to view report</div>
-                            </div>
+                            ))}
                           </div>
                         </div>
 
                       </div>
 
-                      {/* ── PAGE 2 — Right (Metrics + Highlights + Agent) ── */}
+                      {/* ── PAGE 2 — Right (Highway + Highlights + Agent) ── */}
                       <div style={{ flex: 1, height: 1690, display: "flex", flexDirection: "column", padding: "52px 52px 44px", boxSizing: "border-box", gap: 28, background: headerBg, borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
 
-                        {/* 1. Section label */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                          <MapPin size={26} color="#1a1814" />
-                          <div style={{ fontSize: 22, fontWeight: 900, color: textColor, letterSpacing: "0.15em", textTransform: "uppercase" }}>Property Details</div>
-                        </div>
-
-                        {/* 2. Property Stats — 2×2 grid with bigger fonts */}
-                        <div style={{
-                          display: "grid", gridTemplateColumns: "repeat(2, 1fr)",
-                          gap: 20, flexShrink: 0
-                        }}>
-                          {propCards.map(({ label, value, icon }) => (
-                            <div key={label} style={{
-                              display: "flex", flexDirection: "column", gap: 8,
-                              padding: "28px 28px 24px", background: "white", borderRadius: 24, border: "2px solid #ede8de",
-                              boxShadow: "0 4px 20px rgba(0,0,0,0.03)"
-                            }}>
-                              <div style={{ transform: "scale(1.8)", transformOrigin: "left center", marginBottom: 10 }}>
-                                {icon}
-                              </div>
-                              <div style={{ fontSize: 18, color: "#5a5248", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                                {label}
-                              </div>
-                              <div style={{ fontSize: 52, fontWeight: 900, color: textColor, lineHeight: 1.05 }}>
-                                {value}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* 3. Highway Proximity — Overpass data */}
+                        {/* 1. Highway Proximity — Overpass data */}
                         {(highwayInfo.length > 0 || highwayLoading) && (
                           <div style={{ flexShrink: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingLeft: 4 }}>
@@ -1602,8 +1573,7 @@ export function BrochureDialog({
                           </div>
                         )}
 
-
-                        {/* 4. Nearby Places — single column list */}
+                        {/* 2. Nearby Places — single column list */}
                         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, paddingLeft: 4 }}>
                             <MapPin size={26} color="#1a1814" />
@@ -1612,7 +1582,7 @@ export function BrochureDialog({
                             </div>
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 14, overflow: "hidden" }}>
-                            {sortedPois.slice(0, 5).map((poi) => {
+                            {sortedPois.slice(0, 10).map((poi) => {
                               const meta = CATEGORY_META[poi.type] ?? { Icon: MapPin, color: "#666" };
                               const Icon = meta.Icon;
                               return (
@@ -1642,7 +1612,7 @@ export function BrochureDialog({
                           </div>
                         </div>
 
-                        {/* 4. Agent Section — Let's Connect on top, agent info below */}
+                        {/* 3. Agent Section — Let's Connect on top, agent info below */}
                         <div style={{
                           background: "#fffbf0", borderRadius: 28,
                           border: `3px solid ${accentColor}`,
@@ -1677,7 +1647,20 @@ export function BrochureDialog({
                     </div>
                   )}
 
-                  {template.id !== "whatsapp" && template.id !== "instagram-square" && template.id !== "instagram-portrait" && template.id !== "facebook" && template.id !== "a4" && (
+                  {template.id === "captured-image" && (
+                    <div style={{ position: "relative", width: "100%", height: "100%", background: "#eceae3" }}>
+                      {mapImageUrl ? (
+                        <img src={mapImageUrl} crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+                          <MapPin size={48} color="#c8b97e" />
+                          <span style={{ fontSize: 20, color: "#9e9689" }}>Map capture will appear here</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {template.id !== "whatsapp" && template.id !== "instagram-square" && template.id !== "instagram-portrait" && template.id !== "facebook" && template.id !== "a4" && template.id !== "captured-image" && (
                     <>
                       {/* ── TITLE ROW ───────────────────────────────────────── */}
                   <div style={{

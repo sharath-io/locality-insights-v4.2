@@ -95,6 +95,7 @@ export default function LandingPage() {
     setCoordinates,
     setSelectedCategories,
     setIsGenerating,
+    isGenerating,
     setLocationReport,
     resetAnalysis,
     setAutoBrochureMode,
@@ -113,7 +114,7 @@ export default function LandingPage() {
     const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
     // Wipe any stale analysis state before starting a fresh report
     resetAnalysis();
-    setIsGenerating(false);
+    setIsGenerating(true);
     setLocationReport(null);
     setSelectedCategories(labels);
     setCoordinates(parsedCoords);
@@ -123,7 +124,7 @@ export default function LandingPage() {
   const handleGenerateBrochureDirectly = () => {
     const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
     resetAnalysis();
-    setIsGenerating(false);
+    setIsGenerating(true);
     setLocationReport(null);
     setSelectedCategories(labels);
     setAutoBrochureMode(true);
@@ -167,32 +168,32 @@ export default function LandingPage() {
 
             <button
               onClick={handleGenerate}
-              disabled={!canGenerate}
+              disabled={!canGenerate || isGenerating}
               className="mt-5 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ backgroundColor: canGenerate ? "#6b7c5e" : "#4a5540" }}
-              onMouseEnter={(e) => { if (canGenerate) e.currentTarget.style.backgroundColor = "#5a6a4f"; }}
-              onMouseLeave={(e) => { if (canGenerate) e.currentTarget.style.backgroundColor = "#6b7c5e"; }}
+              style={{ backgroundColor: canGenerate && !isGenerating ? "#6b7c5e" : "#4a5540" }}
+              onMouseEnter={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.backgroundColor = "#5a6a4f"; }}
+              onMouseLeave={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.backgroundColor = "#6b7c5e"; }}
             >
-              Generate Vicinity Report →
+              {isGenerating && !useReportStore.getState().autoBrochureMode ? "Generating..." : "Generate Vicinity Report →"}
             </button>
 
             <button
               onClick={handleGenerateBrochureDirectly}
-              disabled={!canGenerate}
+              disabled={!canGenerate || isGenerating}
               className="mt-3 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{
-                background: canGenerate
+                background: canGenerate && !isGenerating
                   ? "linear-gradient(135deg, #c8b97e 0%, #a8975e 100%)"
                   : "rgba(200,185,126,0.25)",
-                color: canGenerate ? "#0c1018" : "rgba(200,185,126,0.5)",
+                color: canGenerate && !isGenerating ? "#0c1018" : "rgba(200,185,126,0.5)",
               }}
-              onMouseEnter={(e) => { if (canGenerate) e.currentTarget.style.opacity = "0.88"; }}
-              onMouseLeave={(e) => { if (canGenerate) e.currentTarget.style.opacity = "1"; }}
+              onMouseEnter={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.opacity = "0.88"; }}
+              onMouseLeave={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.opacity = "1"; }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
               </svg>
-              Generate Brochure Directly
+              {isGenerating && useReportStore.getState().autoBrochureMode ? "Generating Brochure..." : "Generate Brochure Directly"}
             </button>
 
             <div className="mt-6 flex flex-wrap gap-2">
