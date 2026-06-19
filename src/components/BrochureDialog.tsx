@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toPng, toJpeg } from "html-to-image";
+import { jsPDF } from "jspdf";
 import {
   X,
   Download,
@@ -218,7 +219,7 @@ export function BrochureDialog({
   const [agentPhone, setAgentPhone]     = useState(agent?.phone     ?? "+91 98765 43210");
   const [agentEmail, setAgentEmail]     = useState(agent?.email     ?? "john.smith@propertyhub.com");
   const [agentLocation, setAgentLocation] = useState(agent?.location ?? "Visakhapatnam, Andhra Pradesh");
-  const [agentPhoto]                    = useState(agent?.photoUrl  ?? "https://images.pexels.com/photos/91227/pexels-photo-91227.jpeg");
+  const [agentPhoto, setAgentPhoto]     = useState(agent?.photoUrl  ?? "https://images.pexels.com/photos/91227/pexels-photo-91227.jpeg");
 
   // ── Color customization ───────────────────────────────────────────────────
   const [accentColor, setAccentColor] = useState("#FFDE59");
@@ -318,15 +319,28 @@ export function BrochureDialog({
         const url = await toPng(el, opts);
         triggerDl(url, `brochure-${reportId}.png`);
       } else {
-        const url = await toPng(el, opts);
-        const w = window.open();
-        if (w) {
-          w.document.write(
-            `<html><head><title>Brochure — ${reportId}</title><style>body{margin:0}img{width:100%;height:auto}</style></head>` +
-            `<body><img src="${url}" /></body></html>`
-          );
-          w.document.close();
-          setTimeout(() => w.print(), 600);
+        const pdfOpts = { ...opts, pixelRatio: template.id === "a4" ? 1 : opts.pixelRatio, quality: 0.95 };
+        const url = await toJpeg(el, pdfOpts);
+        if (template.id === "a4") {
+          const pdf = new jsPDF({
+            orientation: "portrait",
+            unit: "px",
+            format: [1196, 1690],
+          });
+          // Page 1
+          pdf.addImage(url, 'JPEG', -32, -32, 2480, 1754);
+          // Page 2
+          pdf.addPage([1196, 1690], "portrait");
+          pdf.addImage(url, 'JPEG', -1252, -32, 2480, 1754);
+          pdf.save(`brochure-${reportId}.pdf`);
+        } else {
+          const pdf = new jsPDF({
+            orientation: template.pxW > template.pxH ? "landscape" : "portrait",
+            unit: "px",
+            format: [template.pxW, template.pxH],
+          });
+          pdf.addImage(url, 'JPEG', 0, 0, template.pxW, template.pxH);
+          pdf.save(`brochure-${reportId}.pdf`);
         }
       }
       setDlState(`done-${fmt}`);
@@ -511,7 +525,7 @@ export function BrochureDialog({
                           border: "4px solid white"
                         }}>
                           {mapImageUrl ? (
-                            <img src={mapImageUrl} alt="Property map" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            <img src={mapImageUrl}crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           ) : (
                             <div style={{ width: "100%", height: "100%", background: "#e8e3da" }} />
                           )}
@@ -608,7 +622,7 @@ export function BrochureDialog({
                         padding: "20px 32px", flexShrink: 0
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-                          <img src={agentPhoto} alt={agentName} crossOrigin="anonymous" style={{ width: 100, height: 100, borderRadius: "50%", objectFit: "cover", border: "4px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.1)" }} />
+                          <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 100, height: 100, borderRadius: "50%", objectFit: "cover", border: "4px solid white", boxShadow: "0 4px 16px rgba(0,0,0,0.1)" }} />
                           <div>
                             <div style={{ fontSize: 32, fontWeight: 900, color: "#1a1814", marginBottom: 6 }}>{agentName}</div>
                             <div style={{ fontSize: 18, color: "#5a5248", marginBottom: 12 }}>{agentRole}</div>
@@ -660,7 +674,7 @@ export function BrochureDialog({
                           <img
                             src={mapImageUrl}
                             alt="Property map"
-                            crossOrigin="anonymous"
+                            crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                             style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "top", display: "block" }}
                           />
                         ) : (
@@ -869,7 +883,7 @@ export function BrochureDialog({
                                 <img
                                   src={agentPhoto}
                                   alt={agentName}
-                                  crossOrigin="anonymous"
+                                  crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                                   style={{
                                     width: 64, height: 64,
                                     borderRadius: "50%", objectFit: "cover",
@@ -951,7 +965,7 @@ export function BrochureDialog({
                             <img
                               src={mapImageUrl}
                               alt="Property map"
-                              crossOrigin="anonymous"
+                              crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                             />
                           ) : (
@@ -1136,7 +1150,7 @@ export function BrochureDialog({
                                   <img
                                     src={agentPhoto}
                                     alt={agentName}
-                                    crossOrigin="anonymous"
+                                    crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                                     style={{
                                       width: 80, height: 80,
                                       borderRadius: "50%", objectFit: "cover",
@@ -1233,7 +1247,7 @@ export function BrochureDialog({
                         {/* Map Image */}
                         <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#e8e4db" }}>
                           {mapImageUrl ? (
-                            <img src={mapImageUrl} alt="Property map" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            <img src={mapImageUrl}crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                           ) : (
                             <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
                               <MapPin size={48} color="#c8b97e" />
@@ -1329,7 +1343,7 @@ export function BrochureDialog({
                               <img
                                 src={agentPhoto}
                                 alt={agentName}
-                                crossOrigin="anonymous"
+                                crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                                 style={{
                                   width: 64, height: 64,
                                   borderRadius: "50%", objectFit: "cover",
@@ -1415,7 +1429,7 @@ export function BrochureDialog({
                         {/* Map Section — fills the remaining height */}
                         <div style={{ flex: 1, minHeight: 0, position: "relative", borderRadius: 32, overflow: "hidden", boxShadow: "0 12px 48px rgba(0,0,0,0.08)", border: "6px solid white" }}>
                           {mapImageUrl ? (
-                            <img src={mapImageUrl} alt="Property map" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            <img src={mapImageUrl}crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           ) : (
                             <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
                               <MapPin size={48} color="#c8b97e" />
@@ -1445,7 +1459,7 @@ export function BrochureDialog({
                           </div>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 28 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-                              <img src={agentPhoto} alt={agentName} crossOrigin="anonymous" style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
+                              <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
                               <div>
                                 <div style={{ fontSize: 44, fontWeight: 900, color: "#1a1814", marginBottom: 8 }}>{agentName}</div>
                                 <div style={{ fontSize: 24, color: "#5a5248", marginBottom: 16 }}>{agentRole}</div>
@@ -1550,7 +1564,7 @@ export function BrochureDialog({
                           </div>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 28 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-                              <img src={agentPhoto} alt={agentName} crossOrigin="anonymous" style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
+                              <img src={agentPhoto} alt={agentName} crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 140, height: 140, borderRadius: "50%", objectFit: "cover", border: "5px solid white", boxShadow: "0 6px 24px rgba(0,0,0,0.12)", flexShrink: 0 }} />
                               <div>
                                 <div style={{ fontSize: 44, fontWeight: 900, color: "#1a1814", marginBottom: 8 }}>{agentName}</div>
                                 <div style={{ fontSize: 24, color: "#5a5248", marginBottom: 16 }}>{agentRole}</div>
@@ -1630,7 +1644,7 @@ export function BrochureDialog({
                         <img
                           src={mapImageUrl}
                           alt="Property map"
-                          crossOrigin="anonymous"
+                          crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                         />
                       ) : (
@@ -1754,7 +1768,7 @@ export function BrochureDialog({
                       <img
                         src={agentPhoto}
                         alt={agentName}
-                        crossOrigin="anonymous"
+                        crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
                         style={{
                           width: 52, height: 52,
                           borderRadius: "50%",
@@ -2000,6 +2014,31 @@ export function BrochureDialog({
                         ))}
                         <div style={{ height: 1, background: "#e8e3d8", margin: "2px 0" }} />
                         <div style={{ fontSize: 9, color: accentColor, fontWeight: 700, marginBottom: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>Agent Info</div>
+                        <div style={{ display: "flex", justifyContent: "center", margin: "12px 0 16px" }}>
+                          <label style={{ position: "relative", cursor: "pointer", display: "inline-block" }}>
+                            <img src={agentPhoto} alt="Agent" crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"} style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: "2px solid #ede8de" }} />
+                            <div style={{ position: "absolute", bottom: -2, right: -2, background: accentColor, width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid white", color: "#1a1814" }}>
+                              <FileImage size={12} />
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    if (event.target?.result) {
+                                      setAgentPhoto(event.target.result as string);
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              style={{ display: "none" }}
+                            />
+                          </label>
+                        </div>
                         {[
                           { label: "Agent Name", value: agentName, onChange: setAgentName },
                           { label: "Agent Role", value: agentRole, onChange: setAgentRole },
