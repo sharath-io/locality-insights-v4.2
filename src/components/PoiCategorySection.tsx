@@ -55,7 +55,7 @@ export function PoiCategorySection({
           <Icon className="w-4 h-4" />
         </div>
         <h3 className="text-[14px] font-bold tracking-[0.12em] text-[var(--navy)] uppercase">
-          {meta.label}
+          {type}
         </h3>
       </div>
 

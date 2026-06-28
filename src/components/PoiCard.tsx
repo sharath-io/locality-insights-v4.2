@@ -120,7 +120,7 @@ export function PoiCard({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: categoryColor }}>
-          {poiMeta.label}
+          {poi.type}
         </div>
         <h4 className="text-[13px] font-semibold text-[var(--navy)] leading-tight mb-1 truncate">
           {poi.name}

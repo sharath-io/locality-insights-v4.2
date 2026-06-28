@@ -1,4 +1,10 @@
-export type HighwayInfo = { ref: string; name: string; distanceKm: number };
+export type HighwayInfo = {
+  ref: string;
+  name: string;
+  distanceKm: number;
+  /** Exact lat/lng of the closest physical point on this highway to the site */
+  closestPoint: { lat: number; lng: number };
+};
 
 export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -11,35 +17,39 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-export function distanceToSegmentKm(lat: number, lng: number, lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const x = lng;
-  const y = lat;
-  const x1 = lng1;
-  const y1 = lat1;
-  const x2 = lng2;
-  const y2 = lat2;
-  
-  // Scale longitude by cos(lat) to approximate local flat geometry
-  const cosLat = Math.cos((y * Math.PI) / 180);
-  
-  const dx = (x2 - x1) * cosLat;
-  const dy = y2 - y1;
+/** Returns both the distance and the closest projected point on the segment */
+export function closestPointOnSegment(
+  lat: number, lng: number,
+  lat1: number, lng1: number,
+  lat2: number, lng2: number,
+): { distanceKm: number; point: { lat: number; lng: number } } {
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+
+  const dx = (lng2 - lng1) * cosLat;
+  const dy = lat2 - lat1;
   const l2 = dx * dx + dy * dy;
-  
-  if (l2 === 0) return haversineKm(y, x, y1, x1);
-  
-  // Projection factor t
-  let t = (((x - x1) * cosLat) * dx + (y - y1) * dy) / l2;
+
+  if (l2 === 0) {
+    return {
+      distanceKm: haversineKm(lat, lng, lat1, lng1),
+      point: { lat: lat1, lng: lng1 },
+    };
+  }
+
+  let t = (((lng - lng1) * cosLat) * dx + (lat - lat1) * dy) / l2;
   t = Math.max(0, Math.min(1, t));
-  
-  const projX = x1 + t * (x2 - x1);
-  const projY = y1 + t * (y2 - y1);
-  
-  return haversineKm(y, x, projY, projX);
+
+  const projLng = lng1 + t * (lng2 - lng1);
+  const projLat = lat1 + t * (lat2 - lat1);
+
+  return {
+    distanceKm: haversineKm(lat, lng, projLat, projLng),
+    point: { lat: projLat, lng: projLng },
+  };
 }
 
 export async function fetchNearestHighways(lat: number, lng: number): Promise<HighwayInfo[]> {
-  // Query Overpass for trunk/motorway/primary roads with a ref tag within 25km
+  // Query Overpass for trunk/motorway roads with a ref tag within 25km
   const query = `
 [out:json][timeout:15];
 (
@@ -55,34 +65,42 @@ out geom;
     });
     if (!res.ok) return [];
     const json = await res.json() as { elements: Array<{ tags?: { ref?: string; name?: string }; geometry?: Array<{ lat: number; lon: number }> }> };
-    
+
     const highwaysMap = new Map<string, HighwayInfo>();
+
     for (const el of json.elements) {
       if (!el.geometry || !el.tags?.ref) continue;
-      
+
       let minDist = Infinity;
+      let bestPoint: { lat: number; lng: number } = { lat: el.geometry[0].lat, lng: el.geometry[0].lon };
+
       if (el.geometry.length === 1) {
         minDist = haversineKm(lat, lng, el.geometry[0].lat, el.geometry[0].lon);
+        bestPoint = { lat: el.geometry[0].lat, lng: el.geometry[0].lon };
       } else {
         for (let i = 0; i < el.geometry.length - 1; i++) {
           const p1 = el.geometry[i];
-          const p2 = el.geometry[i+1];
-          const dist = distanceToSegmentKm(lat, lng, p1.lat, p1.lon, p2.lat, p2.lon);
-          if (dist < minDist) minDist = dist;
+          const p2 = el.geometry[i + 1];
+          const { distanceKm, point } = closestPointOnSegment(lat, lng, p1.lat, p1.lon, p2.lat, p2.lon);
+          if (distanceKm < minDist) {
+            minDist = distanceKm;
+            bestPoint = point;
+          }
         }
       }
-      
+
       const ref = el.tags.ref;
-      
+
       if (!highwaysMap.has(ref) || minDist < highwaysMap.get(ref)!.distanceKm) {
         highwaysMap.set(ref, {
           ref,
           name: el.tags.name ?? ref,
           distanceKm: +minDist.toFixed(1),
+          closestPoint: bestPoint,
         });
       }
     }
-    
+
     return Array.from(highwaysMap.values())
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, 3);

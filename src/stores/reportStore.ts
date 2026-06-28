@@ -77,13 +77,6 @@ export const useReportStore = create<ReportState>((set) => ({
       return { selectedPois: { ...state.selectedPois, [poi.type]: updated } };
     }),
 
-  clearCategory: (categoryType) =>
-    set((state) => {
-      const next = { ...state.selectedPois };
-      delete next[categoryType];
-      return { selectedPois: next };
-    }),
-
   clearAllPois: () => set({ selectedPois: {} }),
 
   setHoveredPoi: (hoveredPoi) => set({ hoveredPoi }),

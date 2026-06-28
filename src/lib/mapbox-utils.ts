@@ -26,7 +26,7 @@ export const MAPBOX_PROVIDER_STYLES: Record<string, { url: string; staticId: str
 // Flat 2D camera settings
 export const CINEMATIC_PITCH = 0;
 export const CINEMATIC_BEARING = 0;
-export const CINEMATIC_ZOOM = 12;
+export const CINEMATIC_ZOOM = 11;
 
 // ── Layer lists ───────────────────────────────────────────────────────────────
 

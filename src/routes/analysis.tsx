@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Camera, List, CircleDot } from "lucide-react";
+import { ArrowLeft, MapPin, Camera, List, CircleDot, Minus, Navigation } from "lucide-react";
 import type { BrochurePOI } from "@/components/BrochureDialog";
 import { useReportStore } from "@/stores/reportStore";
 import { usePlacesSearch } from "@/hooks/usePlacesSearch";
@@ -14,6 +14,7 @@ import { AutoBrochureLoader } from "@/components/AutoBrochureLoader";
 import { PoiCategorySection } from "@/components/PoiCategorySection";
 import type { PoiRow } from "@/components/PoiCard";
 import { fetchNearestHighways, type HighwayInfo } from "@/lib/fetch-highways";
+import { HighwayMiniMap } from "@/components/HighwayMiniMap";
 
 export const Route = createFileRoute("/analysis")({
   head: () => ({
@@ -265,16 +266,26 @@ function AnalysisPage() {
       <section className="px-6 md:px-10 pt-6">
         <div
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
-          style={{ height: "clamp(260px, 48vh, 600px)" }}
+          style={{ height: "calc(100vh - 380px)", minHeight: "350px" }}
         >
           <MapView showDistanceRings={showDistanceRings} />
+
+          {/* GTA-style circular highway mini-map — bottom-left overlay */}
+          <HighwayMiniMap
+            lat={coordinates.lat}
+            lng={coordinates.lng}
+            token={keys?.mapboxToken}
+            provider={mapProvider}
+            highwayInfo={highwayInfo}
+            highwayLoading={highwayLoading}
+          />
 
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow font-mono text-[11px] text-[var(--navy)]">
             {coordinates.lat.toFixed(5)}° N, {coordinates.lng.toFixed(5)}° E
           </div>
 
           {/* Selected POIs List (Top Right) */}
-          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-1.5 sm:gap-2 max-h-[100px] sm:max-h-[calc(48vh-80px)] overflow-y-auto pointer-events-none [&::-webkit-scrollbar]:hidden z-50">
+          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-1.5 sm:gap-2 max-h-[100px] sm:max-h-[calc(100%-40px)] overflow-y-auto pointer-events-none [&::-webkit-scrollbar]:hidden z-50">
             {Object.values(selectedPois).flat().sort((a, b) => a.distanceKm - b.distanceKm).map((poi) => {
               const meta = resolvePoiMeta(poi.type, poi.types);
               const Icon = meta.Icon;
@@ -343,27 +354,7 @@ function AnalysisPage() {
 
         {/* Bottom controls below map */}
         <div className="mt-3 flex items-center justify-between flex-wrap gap-4">
-          {/* Highway Badges on left */}
-          <div className="flex flex-wrap items-center gap-3">
-            {(highwayInfo.length > 0 || highwayLoading) && (
-              <>
-                {highwayLoading ? (
-                  <span className="text-[13px] text-[var(--muted)] animate-pulse">Fetching highways...</span>
-                ) : (
-                  highwayInfo.map((hw) => (
-                    <div 
-                      key={hw.ref} 
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#f59e0b]/10 border border-[#f59e0b]/20 rounded-md shadow-sm"
-                    >
-                      <span className="text-[12px] text-[#d97706] font-black leading-none pt-[1px]">✦</span>
-                      <span className="font-bold text-[12px] text-[#92400e] tracking-wide">{hw.ref}</span>
-                      <span className="text-[12px] text-[var(--navy)] font-medium pl-0.5">{hw.distanceKm} km</span>
-                    </div>
-                  ))
-                )}
-              </>
-            )}
-          </div>
+          <div className="flex flex-wrap items-center gap-3" />
 
           {/* Style selection + Brochure CTA on right */}
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -597,7 +588,11 @@ function AnalysisPage() {
 // into MapboxMap. Kept in this file because it's trivially small and tightly
 // coupled to the AnalysisPage's showDistanceRings state.
 
-function MapView({ showDistanceRings }: { showDistanceRings?: boolean }) {
+function MapView({
+  showDistanceRings,
+}: {
+  showDistanceRings?: boolean;
+}) {
   const coordinates = useReportStore((s) => s.coordinates)!;
   const mapProvider = useReportStore((s) => s.mapProvider);
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);

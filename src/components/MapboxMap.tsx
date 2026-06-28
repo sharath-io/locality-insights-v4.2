@@ -19,7 +19,6 @@ import {
   createPoiMarkerEl,
   renderDistanceRings,
 } from "@/lib/mapbox-utils";
-
 interface CustomMarker extends mapboxgl.Marker {
   __poiId?: string;
 }
@@ -267,15 +266,24 @@ export function MapboxMap({ lat, lng, token, showDistanceRings, provider }: Mapb
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    const activePois = [...Object.values(selectedPoisById), ...(hoveredPoi ? [hoveredPoi] : [])];
+    const activePois = [...Object.values(selectedPoisById)];
 
     if (activePois.length === 0) {
-      map.easeTo({
-        center: [lng, lat],
-        zoom: CINEMATIC_ZOOM,
+      // Fit to ~5.5km bounding box so the 5km ring is nicely visible
+      const radiusKm = 5.5;
+      const dLat = radiusKm / 111;
+      const dLng = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
+      const bounds = new mapboxgl.LngLatBounds(
+        [lng - dLng, lat - dLat],
+        [lng + dLng, lat + dLat]
+      );
+
+      map.fitBounds(bounds, {
+        padding: 40,
+        maxZoom: 13,
+        duration: 900,
         pitch: CINEMATIC_PITCH,
         bearing: CINEMATIC_BEARING,
-        duration: 900,
       });
       return;
     }
