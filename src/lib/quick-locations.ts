@@ -36,4 +36,8 @@ export const QUICK_LOCATIONS: QuickLocation[] = [
     name: "Amazon Hyd Office",
     url: "https://www.google.com/maps/place/Amazon+Hyderabad+Campus+(HYD13)/@17.4185274,78.3440459,622m/data=!3m1!1e3!4m6!3m5!1s0x3bcb93877fae478f:0xef416c0438a2ef!8m2!3d17.4201857!4d78.3454598!16s%2Fg%2F11g6ml5q5d?entry=tts&g_ep=EgoyMDI2MDYxMC4wIPu8ASoASAFQAw%3D%3D&skid=80156867-8e6e-4147-86d7-299330e1f4ba",
   },
+  {
+    name: "IIT -Hyderabad",
+    url: "https://www.google.com/maps/place/Indian+Institute+of+Technology,+Hyderabad/@17.5958032,78.1249263,3698m/data=!3m1!1e3!4m6!3m5!1s0x3bcbefdc136bffbb:0x73414ff6594c9191!8m2!3d17.5947027!4d78.1230401!16s%2Fm%2F04q0rvt?entry=ttu&g_ep=EgoyMDI2MDYxNi4wIKXMDSoASAFQAw%3D%3D",
+  },
 ];

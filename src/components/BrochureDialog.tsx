@@ -63,6 +63,8 @@ export interface BrochureGeneratorProps {
   reportId?: string;
   mapImageUrl?: string;
   sourceCoordinates?: { lat: number; lng: number };
+  highwayInfo?: { ref: string; name: string; distanceKm: number }[];
+  highwayLoading?: boolean;
   nearbyPOIs?: BrochurePOI[];
   propertyDetails?: {
     title?: string;
@@ -92,61 +94,7 @@ const DEF_POIS: BrochurePOI[] = [
   { name: "Tenneti Park",         type: "ATTRACTIONS", distanceKm: 3.8 },
 ];
 
-// ── Overpass highway helper ───────────────────────────────────────────────────
 
-type HighwayInfo = { ref: string; name: string; distanceKm: number };
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-async function fetchNearestHighways(lat: number, lng: number): Promise<HighwayInfo[]> {
-  // Query Overpass for trunk/motorway/primary roads with a ref tag within 25km
-  const query = `
-[out:json][timeout:15];
-(
-  way["highway"~"^(motorway|trunk)$"]["ref"](around:25000,${lat},${lng});
-);
-out center;
-`;
-  try {
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: `data=${encodeURIComponent(query)}`,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-    if (!res.ok) return [];
-    const json = await res.json() as { elements: Array<{ tags?: { ref?: string; name?: string }; center?: { lat: number; lon: number } }> };
-    
-    const highwaysMap = new Map<string, HighwayInfo>();
-    for (const el of json.elements) {
-      if (!el.center || !el.tags?.ref) continue;
-      const dist = haversineKm(lat, lng, el.center.lat, el.center.lon);
-      const ref = el.tags.ref;
-      
-      if (!highwaysMap.has(ref) || dist < highwaysMap.get(ref)!.distanceKm) {
-        highwaysMap.set(ref, {
-          ref,
-          name: el.tags.name ?? ref,
-          distanceKm: +dist.toFixed(1),
-        });
-      }
-    }
-    
-    return Array.from(highwaysMap.values())
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, 3);
-  } catch {
-    return [];
-  }
-}
 
 // ── Google Font injection ─────────────────────────────────────────────────────
 
@@ -228,6 +176,8 @@ export function BrochureDialog({
   reportId = "VIC-2026-E0C8",
   mapImageUrl = "",
   sourceCoordinates,
+  highwayInfo = [],
+  highwayLoading = false,
   nearbyPOIs,
   propertyDetails,
   agent,
@@ -239,18 +189,6 @@ export function BrochureDialog({
     [nearbyPOIs]
   );
   const sortedPois = useMemo(() => [...pois].sort((a, b) => a.distanceKm - b.distanceKm), [pois]);
-  // ── Nearest highway (Overpass API) ─────────────────────────────────────────
-  const [highwayInfo, setHighwayInfo] = useState<HighwayInfo[]>([]);
-  const [highwayLoading, setHighwayLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setHighwayLoading(true);
-    fetchNearestHighways(coords.lat, coords.lng).then((info) => {
-      setHighwayInfo(info);
-      setHighwayLoading(false);
-    });
-  }, [isOpen, coords.lat, coords.lng]);
 
   // ── Editable state ────────────────────────────────────────────────────────
   const [title, setTitle]               = useState(propertyDetails?.title       ?? "Prime Land for Investment");
@@ -1537,33 +1475,33 @@ export function BrochureDialog({
                               <div style={{ fontSize: 22, fontWeight: 900, color: textColor, letterSpacing: "0.15em", textTransform: "uppercase" }}>Highway Connectivity</div>
                             </div>
                             <div style={{
-                              background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-                              borderRadius: 24, padding: "28px 36px",
-                              border: "2px solid #f59e0b",
-                              boxShadow: "0 8px 32px rgba(245,158,11,0.15)",
-                              display: "flex", alignItems: "center", gap: 24
+                              display: "flex", alignItems: "center", gap: 24, paddingLeft: 4
                             }}>
-                              <div style={{
-                                width: 72, height: 72, borderRadius: 20,
-                                background: "#f59e0b",
-                                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                                boxShadow: "0 4px 16px rgba(245,158,11,0.4)",
-                                alignSelf: highwayInfo.length > 1 ? "flex-start" : "center",
-                                marginTop: highwayInfo.length > 1 ? 8 : 0
-                              }}>
-                                <Route size={36} color="white" />
-                              </div>
                               {highwayLoading ? (
-                                <div style={{ fontSize: 22, color: "#92400e", fontStyle: "italic" }}>Fetching highway data…</div>
+                                <div style={{ fontSize: 22, color: "#64748b", fontStyle: "italic" }}>Fetching highway data…</div>
                               ) : (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
                                   {highwayInfo.map(hw => (
-                                    <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                                      <span style={{ fontSize: 36, color: "#f59e0b", fontWeight: 900 }}>✦</span>
-                                      <span style={{ fontSize: 32, fontWeight: 900, color: "#78350f", letterSpacing: "-0.01em" }}>
-                                        {hw.ref}{" "}
-                                        <span style={{ fontWeight: 700, color: "#92400e" }}>National Highway</span>{" "}
-                                        <span style={{ fontWeight: 600, color: "#b45309" }}>within {hw.distanceKm} km</span>
+                                    <div key={hw.ref} style={{ 
+                                      display: "flex", alignItems: "center", gap: 12,
+                                      background: "#fdfbf7",
+                                      border: "2px solid #e8e2d4",
+                                      borderRadius: 9999,
+                                      padding: "8px 24px 8px 8px"
+                                    }}>
+                                      <span style={{ 
+                                        background: "#FFDE59", 
+                                        padding: "8px 16px", 
+                                        borderRadius: 8, 
+                                        fontSize: 26,
+                                        fontWeight: 900,
+                                        color: "#000",
+                                        lineHeight: 1.1
+                                      }}>
+                                        {hw.ref}
+                                      </span>
+                                      <span style={{ fontSize: 26, fontWeight: 700, color: "#1a1814" }}>
+                                        {hw.distanceKm} km
                                       </span>
                                     </div>
                                   ))}

@@ -13,6 +13,7 @@ import { MapboxImageDialog } from "@/components/MapboxImageDialog";
 import { AutoBrochureLoader } from "@/components/AutoBrochureLoader";
 import { PoiCategorySection } from "@/components/PoiCategorySection";
 import type { PoiRow } from "@/components/PoiCard";
+import { fetchNearestHighways, type HighwayInfo } from "@/lib/fetch-highways";
 
 export const Route = createFileRoute("/analysis")({
   head: () => ({
@@ -36,6 +37,7 @@ function AnalysisPage() {
   const hoveredPoi = useReportStore((s) => s.hoveredPoi);
   const setHoveredPoi = useReportStore((s) => s.setHoveredPoi);
   const resetAnalysis = useReportStore((s) => s.resetAnalysis);
+  const clearAllPois = useReportStore((s) => s.clearAllPois);
   const autoBrochureMode = useReportStore((s) => s.autoBrochureMode);
   const setAutoBrochureMode = useReportStore((s) => s.setAutoBrochureMode);
   const [isBrochureOpen, setIsBrochureOpen] = useState(false);
@@ -44,6 +46,8 @@ function AnalysisPage() {
   const [isMapboxImageTopRightOpen, setIsMapboxImageTopRightOpen] = useState(false);
   const [isMapboxImageNoLabelsOpen, setIsMapboxImageNoLabelsOpen] = useState(false);
   const [showDistanceRings, setShowDistanceRings] = useState(true);
+  const [highwayInfo, setHighwayInfo] = useState<HighwayInfo[]>([]);
+  const [highwayLoading, setHighwayLoading] = useState(false);
   const keys = useMapKeys();
 
   // ── Auto-brochure loader step tracking ──────────────────────────────────────
@@ -57,6 +61,15 @@ function AnalysisPage() {
   useEffect(() => {
     if (!coordinates) navigate({ to: "/" });
   }, [coordinates, navigate]);
+
+  useEffect(() => {
+    if (!coordinates) return;
+    setHighwayLoading(true);
+    fetchNearestHighways(coordinates.lat, coordinates.lng).then((info) => {
+      setHighwayInfo(info);
+      setHighwayLoading(false);
+    });
+  }, [coordinates]);
 
   // Clear all analysis state when the user leaves this page
   useEffect(() => {
@@ -233,7 +246,7 @@ function AnalysisPage() {
 
   return (
     <main className="min-h-screen bg-[var(--cream)] font-body pb-32">
-      <header className="flex items-center justify-between px-6 md:px-10 py-5 border-b border-[#e8e2d4]">
+      <header className="flex items-center justify-between px-6 md:px-10 py-3 border-b border-[#e8e2d4]">
         <button
           onClick={() => navigate({ to: "/" })}
           className="flex items-center gap-2 text-[var(--navy)] hover:opacity-70 transition text-sm font-medium"
@@ -252,7 +265,7 @@ function AnalysisPage() {
       <section className="px-6 md:px-10 pt-6">
         <div
           className="relative w-full rounded-2xl overflow-hidden shadow-lg border border-[#e8e2d4]"
-          style={{ height: "48vh" }}
+          style={{ height: "clamp(260px, 48vh, 600px)" }}
         >
           <MapView showDistanceRings={showDistanceRings} />
 
@@ -261,20 +274,20 @@ function AnalysisPage() {
           </div>
 
           {/* Selected POIs List (Top Right) */}
-          <div className="absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(48vh-80px)] overflow-y-auto pointer-events-none [&::-webkit-scrollbar]:hidden z-50">
+          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 flex flex-col gap-1.5 sm:gap-2 max-h-[100px] sm:max-h-[calc(48vh-80px)] overflow-y-auto pointer-events-none [&::-webkit-scrollbar]:hidden z-50">
             {Object.values(selectedPois).flat().sort((a, b) => a.distanceKm - b.distanceKm).map((poi) => {
               const meta = resolvePoiMeta(poi.type, poi.types);
               const Icon = meta.Icon;
               return (
                 <div
                   key={poi.id}
-                  className="flex items-center gap-2 bg-white/95 backdrop-blur px-3 py-2 rounded-md shadow pointer-events-auto border border-[#e8e2d4]"
+                  className="flex items-center gap-1.5 sm:gap-2 bg-white/95 backdrop-blur px-2 sm:px-3 py-1.5 sm:py-2 rounded-md shadow pointer-events-auto border border-[#e8e2d4]"
                 >
-                  <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
-                  <span className="text-[12px] font-medium text-[var(--navy)] max-w-[140px] truncate" title={poi.name}>
+                  <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" style={{ color: meta.color }} />
+                  <span className="text-[10px] sm:text-[12px] font-medium text-[var(--navy)] max-w-[80px] sm:max-w-[140px] truncate" title={poi.name}>
                     {poi.name}
                   </span>
-                  <span className="text-[11px] font-bold shrink-0" style={{ color: meta.color }}>
+                  <span className="text-[10px] sm:text-[11px] font-bold shrink-0" style={{ color: meta.color }}>
                     {poi.distanceKm.toFixed(1)}km
                   </span>
                 </div>
@@ -283,7 +296,7 @@ function AnalysisPage() {
           </div>
 
           {/* Map provider switcher */}
-          <div className="absolute bottom-4 right-4 flex gap-1 bg-white/95 backdrop-blur rounded-3xl p-1 shadow flex-wrap max-w-xl justify-end">
+          <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 flex gap-1 bg-white/95 backdrop-blur rounded-3xl p-1 shadow flex-wrap max-w-[180px] sm:max-w-xl justify-end">
             {(["mapbox-v1", "mapbox-v2", "mapbox-v3", "mapbox-coast", "mapbox-skeleton"] as const).map((p) => {
               const active = mapProvider === p;
               return (
@@ -328,15 +341,37 @@ function AnalysisPage() {
           )}
         </div>
 
-        {/* Style selection + Brochure CTA below map */}
-        <div className="mt-3 flex items-center justify-between">
-          <div />
-          <div className="flex items-center gap-2">
+        {/* Bottom controls below map */}
+        <div className="mt-3 flex items-center justify-between flex-wrap gap-4">
+          {/* Highway Badges on left */}
+          <div className="flex flex-wrap items-center gap-3">
+            {(highwayInfo.length > 0 || highwayLoading) && (
+              <>
+                {highwayLoading ? (
+                  <span className="text-[13px] text-[var(--muted)] animate-pulse">Fetching highways...</span>
+                ) : (
+                  highwayInfo.map((hw) => (
+                    <div 
+                      key={hw.ref} 
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#f59e0b]/10 border border-[#f59e0b]/20 rounded-md shadow-sm"
+                    >
+                      <span className="text-[12px] text-[#d97706] font-black leading-none pt-[1px]">✦</span>
+                      <span className="font-bold text-[12px] text-[#92400e] tracking-wide">{hw.ref}</span>
+                      <span className="text-[12px] text-[var(--navy)] font-medium pl-0.5">{hw.distanceKm} km</span>
+                    </div>
+                  ))
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Style selection + Brochure CTA on right */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* Show Distance Rings — always visible */}
             <button
               id="show-distance-rings-btn"
               onClick={() => setShowDistanceRings((v) => !v)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
               style={{
                 background: showDistanceRings
                   ? "linear-gradient(135deg, #1a56db15 0%, #1a56db08 100%)"
@@ -356,7 +391,7 @@ function AnalysisPage() {
                 <button
                   id="capture-mapbox-image-btn"
                   onClick={() => setIsMapboxImageOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
                   style={{
                     background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
                     borderColor: "#e8e2d4",
@@ -371,7 +406,7 @@ function AnalysisPage() {
                 <button
                   id="capture-labels-separately-btn"
                   onClick={() => setIsMapboxImageTopRightOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
                   style={{
                     background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
                     borderColor: "#e8e2d4",
@@ -386,7 +421,7 @@ function AnalysisPage() {
                 <button
                   id="capture-no-labels-btn"
                   onClick={() => setIsMapboxImageNoLabelsOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
                   style={{
                     background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
                     borderColor: "#e8e2d4",
@@ -411,6 +446,8 @@ function AnalysisPage() {
         reportId={reportId}
         mapImageUrl={capturedMapImageUrl}
         sourceCoordinates={coordinates ?? undefined}
+        highwayInfo={highwayInfo}
+        highwayLoading={highwayLoading}
         nearbyPOIs={brochurePOIs}
         propertyDetails={{
           subtitle: locationReport?.site?.label !== "Site Location" ? locationReport?.site?.label : undefined,
@@ -474,16 +511,29 @@ function AnalysisPage() {
 
       {/* ── PLACES LIST (directly below map) ── */}
       <section className="px-6 md:px-10 pt-10 max-w-7xl mx-auto">
-        <div className="mb-8">
-          <div className="text-[10px] tracking-[0.25em] text-[var(--gold)] uppercase font-medium">
-            Vicinity Intelligence
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="text-[10px] tracking-[0.25em] text-[var(--gold)] uppercase font-medium">
+              Vicinity Intelligence
+            </div>
+            <h2 className="font-heading text-[24px] text-[var(--navy)] mt-1">
+              Important Nearby Places
+            </h2>
+            <p className="text-[12px] text-black font-medium mt-1">
+              Check any locations to pin them on the map — select multiple per category
+            </p>
           </div>
-          <h2 className="font-heading text-[24px] text-[var(--navy)] mt-1">
-            Important Nearby Places
-          </h2>
-          <p className="text-[12px] text-[var(--muted)] mt-1">
-            Check any locations to pin them on the map — select multiple per category
-          </p>
+
+          <div className="flex justify-end pb-1">
+            {Object.keys(selectedPois).length > 0 && (
+              <button
+                onClick={clearAllPois}
+                className="bg-white text-[var(--navy)] px-3 py-1.5 sm:px-4 sm:py-1.5 rounded-full font-semibold text-[11px] sm:text-[13px] shadow-sm flex items-center gap-1.5 hover:bg-[#faf8f4] border border-[#e8e2d4] transition"
+              >
+                Clear all pins
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Loading skeleton */}

@@ -5,6 +5,7 @@
  */
 
 import { motion } from "framer-motion";
+import { Pin } from "lucide-react";
 import { resolvePoiMeta } from "@/lib/map-styles";
 
 export interface PoiRow {
@@ -26,8 +27,9 @@ interface PoiCardProps {
   isSelected: boolean;
   /** Whether the mouse is hovering this row in the list (triggers ghost map marker) */
   isHovered: boolean;
-  /** Category-level color — used for the distance badge */
   categoryColor: string;
+  isNearest?: boolean;
+  isTopRated?: boolean;
   onSelect: (poi: PoiRow) => void;
   onHover: (poi: PoiRow) => void;
   onHoverEnd: () => void;
@@ -38,6 +40,8 @@ export function PoiCard({
   isSelected,
   isHovered,
   categoryColor,
+  isNearest,
+  isTopRated,
   onSelect,
   onHover,
   onHoverEnd,
@@ -115,6 +119,9 @@ export function PoiCard({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
+        <div className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: categoryColor }}>
+          {poiMeta.label}
+        </div>
         <h4 className="text-[13px] font-semibold text-[var(--navy)] leading-tight mb-1 truncate">
           {poi.name}
         </h4>
@@ -126,7 +133,9 @@ export function PoiCard({
             {poi.distanceKm.toFixed(1)} km
           </span>
           {poi.rating && poi.rating > 0 && (
-            <span className="text-[var(--muted)]">★ {poi.rating.toFixed(1)}</span>
+            <span className="text-[#9ca3af] flex items-center gap-0.5">
+              <span className="text-[10px]">★</span> {poi.rating.toFixed(1)}
+            </span>
           )}
         </div>
       </div>
@@ -136,11 +145,28 @@ export function PoiCard({
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide text-white"
-          style={{ background: categoryColor }}
+          className="absolute top-2 right-2 text-[#9ca3af] drop-shadow-sm"
         >
-          Pinned
+          <Pin className="w-4 h-4 fill-[#9ca3af]" />
         </motion.div>
+      )}
+
+      {/* Feature Badges (Bottom Right) */}
+      {(isNearest || isTopRated) && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
+          {isTopRated && (
+            <div className="text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest text-[#c28b00] bg-[#ffb800]/10 border border-[#ffb800]/20 flex items-center gap-1 shadow-sm">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Top Pick
+            </div>
+          )}
+          {isNearest && (
+            <div className="text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest text-[var(--navy)] bg-[var(--navy)]/5 border border-[var(--navy)]/10 flex items-center gap-1 shadow-sm">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              Nearest
+            </div>
+          )}
+        </div>
       )}
     </motion.button>
   );

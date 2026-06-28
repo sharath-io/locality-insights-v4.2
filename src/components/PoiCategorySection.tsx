@@ -33,6 +33,13 @@ export function PoiCategorySection({
   const Icon = meta.Icon;
   const pinnedCount = selectedInCategory.length;
 
+  const nearestPoiId = items.length > 0 
+    ? items.reduce((min, p) => p.distanceKm < min.distanceKm ? p : min, items[0]).id 
+    : undefined;
+    
+  // Since items are pre-sorted by quality score in analysis.tsx, the first item is generally the Top Pick
+  const topRatedPoiId = items.length > 0 ? items[0].id : undefined;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -48,24 +55,18 @@ export function PoiCategorySection({
           <Icon className="w-4 h-4" />
         </div>
         <h3 className="text-[14px] font-bold tracking-[0.12em] text-[var(--navy)] uppercase">
-          {type}
+          {meta.label}
         </h3>
-        {pinnedCount > 0 && (
-          <span
-            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: `${meta.color}18`, color: meta.color }}
-          >
-            {pinnedCount} pinned
-          </span>
-        )}
-        <div className="h-px flex-1 bg-gradient-to-r from-[#e8e2d4] to-transparent ml-2" />
       </div>
 
-      {/* Cards grid */}
+      {/* Grid of cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((poi) => {
-          const isSelected = selectedInCategory.some((s) => s.id === poi.id);
+          const isSelected = selectedInCategory.some(
+            (s) => s.name === poi.name && s.lat === poi.lat && s.lng === poi.lng
+          );
           const isHovered = hoveredPoiId === poi.id;
+
           return (
             <PoiCard
               key={poi.id}
@@ -73,6 +74,8 @@ export function PoiCategorySection({
               isSelected={isSelected}
               isHovered={isHovered}
               categoryColor={meta.color}
+              isNearest={poi.id === nearestPoiId}
+              isTopRated={poi.id === topRatedPoiId}
               onSelect={onSelect}
               onHover={onHover}
               onHoverEnd={onHoverEnd}

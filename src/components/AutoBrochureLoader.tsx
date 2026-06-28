@@ -40,8 +40,7 @@ export function AutoBrochureLoader({ step, isGenerating }: AutoBrochureLoaderPro
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col items-center gap-8 bg-white/5 border border-white/10 rounded-3xl p-10 shadow-2xl"
-          style={{ minWidth: 340 }}
+          className="flex flex-col items-center gap-8 bg-white/5 border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl w-[90vw] max-w-[340px]"
         >
           {/* Pulsing gold ring */}
           <div className="relative w-20 h-20 flex items-center justify-center">

@@ -63,6 +63,7 @@ const CATEGORIES: Category[] = [
 ];
 
 const ALL_IDS = CATEGORIES.map((c) => c.id);
+const REALESTATE_IDS = ["transit", "petrol_pumps", "hospitals", "education", "banks_atms", "business_hubs", "shopping", "attractions"];
 
 function parseCoordinates(input: string): { lat: number; lng: number } | null {
   if (!input) return null;
@@ -220,23 +221,34 @@ export default function LandingPage() {
 
       {/* RIGHT PANEL */}
       <section className="w-full md:w-3/5 bg-[var(--cream)] px-8 md:px-12 py-12 md:py-16">
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-8">
           <h2 className="font-heading text-xl md:text-2xl text-[var(--navy)] tracking-wide">
             INTELLIGENCE LAYERS
           </h2>
-          <div className="flex gap-2">
-            {[
-              { label: "SELECT ALL", action: () => setSelected(ALL_IDS) },
-              { label: "CLEAR", action: () => setSelected([]) },
-            ].map((b) => (
-              <button
-                key={b.label}
-                onClick={b.action}
-                className="text-[10px] tracking-[0.15em] px-3 py-1.5 border border-[var(--navy)]/20 rounded text-[var(--navy)] hover:border-[var(--navy)] hover:bg-[var(--navy)] hover:text-white transition-colors cursor-pointer"
-              >
-                {b.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const isRealestateActive = REALESTATE_IDS.every(id => selected.includes(id)) && selected.length === REALESTATE_IDS.length;
+              const isSelectAllActive = selected.length === ALL_IDS.length;
+              const isClearActive = selected.length === 0;
+
+              return [
+                { label: "REALESTATE FOCUSED", isActive: isRealestateActive, action: () => isRealestateActive ? setSelected([]) : setSelected(REALESTATE_IDS) },
+                { label: "SELECT ALL", isActive: isSelectAllActive, action: () => isSelectAllActive ? setSelected([]) : setSelected(ALL_IDS) },
+                { label: "CLEAR", isActive: isClearActive, action: () => setSelected([]) },
+              ].map((b) => (
+                <button
+                  key={b.label}
+                  onClick={b.action}
+                  className={`text-[10px] tracking-[0.12em] sm:tracking-[0.15em] px-3 py-1.5 border rounded transition-colors cursor-pointer ${
+                    b.isActive
+                      ? "border-[var(--navy)] bg-[var(--navy)] text-white"
+                      : "border-[var(--navy)]/20 text-[var(--navy)] hover:border-[var(--navy)] hover:bg-[var(--navy)] hover:text-white"
+                  }`}
+                >
+                  {b.label}
+                </button>
+              ));
+            })()}
           </div>
         </div>
 

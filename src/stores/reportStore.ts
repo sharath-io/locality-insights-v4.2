@@ -36,7 +36,8 @@ interface ReportState {
   /** Toggle a POI selection within its category (add if not present, remove if already selected) */
   togglePoi: (poi: SelectedPoiEntry) => void;
   /** Deselect all POIs for a given category */
-  clearCategory: (categoryType: string) => void;
+  /** Deselect all POIs across all categories */
+  clearAllPois: () => void;
   setHoveredPoi: (poi: SelectedPoiEntry | null) => void;
   setAutoBrochureMode: (v: boolean) => void;
   /** Wipe all analysis data (called when leaving the analysis page) */
@@ -82,6 +83,8 @@ export const useReportStore = create<ReportState>((set) => ({
       delete next[categoryType];
       return { selectedPois: next };
     }),
+
+  clearAllPois: () => set({ selectedPois: {} }),
 
   setHoveredPoi: (hoveredPoi) => set({ hoveredPoi }),
 

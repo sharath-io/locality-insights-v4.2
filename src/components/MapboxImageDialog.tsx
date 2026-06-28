@@ -367,23 +367,23 @@ export function MapboxImageDialog({
 
               {/* Footer — info + download */}
               <div
-                className="flex items-center justify-between px-7 py-5 shrink-0"
+                className="flex flex-col sm:flex-row sm:items-center justify-between px-5 sm:px-7 py-4 sm:py-5 gap-4 shrink-0"
                 style={{ borderTop: "1px solid rgba(200,185,126,0.12)" }}
               >
                 {/* Location info */}
                 <div>
-                  <p className="text-white/90 text-[14px] font-semibold leading-tight">
+                  <p className="text-white/90 text-[13px] sm:text-[14px] font-semibold leading-tight">
                     Vicinity Report — Mapbox View
                   </p>
-                  <div className="flex items-center gap-3 mt-1.5">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1.5">
                     <span
-                      className="text-[11px] font-mono px-2.5 py-1 rounded-full"
+                      className="text-[10px] sm:text-[11px] font-mono px-2.5 py-1 rounded-full"
                       style={{ background: "rgba(200,185,126,0.1)", color: "#c8b97e" }}
                     >
                       {lat.toFixed(5)}° N, {lng.toFixed(5)}° E
                     </span>
                     {poiCount > 0 && (
-                      <span className="text-[11px] text-white/40">
+                      <span className="text-[10px] sm:text-[11px] text-white/40">
                         {poiCount} location{poiCount !== 1 ? "s" : ""} plotted
                       </span>
                     )}
@@ -391,7 +391,7 @@ export function MapboxImageDialog({
                 </div>
 
                 {/* Buttons row */}
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   {/* Generate Brochure button */}
                   {onGenerateBrochure && (
                     <button
