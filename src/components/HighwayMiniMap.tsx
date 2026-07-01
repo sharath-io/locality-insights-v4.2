@@ -362,19 +362,12 @@ export function HighwayMiniMap({
       {/* ── GTA-style circular mini-map ─────────────────────────────────── */}
       <div
         ref={wrapperRef}
-        className="absolute bottom-4 left-4 z-40 group"
+        className="absolute bottom-4 left-4 z-40 group transition-transform duration-300 hover:scale-[1.04] hover:-translate-y-1"
         style={{ width: SIZE, height: SIZE }}
         title="Highway Overview — scroll to zoom · click to expand"
       >
         <div
-          style={{
-            width: SIZE, height: SIZE,
-            borderRadius: "50%",
-            overflow: "hidden",
-            position: "relative",
-            boxShadow: "0 0 0 2.5px rgba(255,255,255,0.18), 0 0 0 5px rgba(26,86,219,0.55), 0 8px 28px rgba(0,0,0,0.55)",
-            cursor: "pointer",
-          }}
+          className="w-full h-full rounded-full overflow-hidden relative cursor-pointer transition-shadow duration-300 shadow-[0_0_0_2.5px_rgba(255,255,255,0.18),0_0_0_5px_rgba(26,86,219,0.55),0_8px_28px_rgba(0,0,0,0.55)] group-hover:shadow-[0_0_0_2.5px_rgba(255,255,255,0.3),0_0_0_6px_rgba(26,86,219,0.7),0_12px_36px_rgba(0,0,0,0.65)]"
           onClick={() => setIsExpanded(true)}
         >
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
@@ -449,6 +442,25 @@ function HighwayExpandedDialog({
   const [drivingDistances, setDrivingDistances] = useState<Record<string, number>>({});
   const [isRouting, setIsRouting] = useState(false);
 
+  // ── Fetch driving distances unconditionally ───────────────────────────────
+  useEffect(() => {
+    if (!token || highwayInfo.length === 0) return;
+    highwayInfo.forEach(async (hw) => {
+      try {
+        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${lng},${lat};${hw.closestPoint.lng},${hw.closestPoint.lat}?overview=false&access_token=${token}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const route = data.routes?.[0];
+        if (route && route.distance != null) {
+          const km = +(route.distance / 1000).toFixed(1);
+          setDrivingDistances(prev => ({ ...prev, [hw.ref]: km }));
+        }
+      } catch {
+        // ignore
+      }
+    });
+  }, [highwayInfo, lat, lng, token]);
+
   const getStyleUrl = (p: string) =>
     MAPBOX_PROVIDER_STYLES[p]?.url ?? MAPBOX_PROVIDER_STYLES["mapbox-v2"].url;
 
@@ -467,8 +479,22 @@ function HighwayExpandedDialog({
 
     mapRef.current = map;
 
+    // ── Immediate Markers (so they show before style loads on slow connections) ──
+    addSitePin(map, lng, lat);
+    highwayInfo.forEach((hw) => {
+      const el = document.createElement("div");
+      el.style.cssText = `display:flex;align-items:center;gap:4px;pointer-events:none;`;
+      el.innerHTML = `
+        <div style="width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
+        <div style="color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
+      `;
+      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+        .setLngLat([hw.closestPoint.lng, hw.closestPoint.lat])
+        .addTo(map);
+      markersRef.current.push(marker);
+    });
+
     map.on("style.load", () => {
-      addSitePin(map, lng, lat);
       if (highwayInfo.length > 0 && token) {
         if (vizMode === "path") {
           setIsRouting(true);
@@ -548,7 +574,7 @@ function HighwayExpandedDialog({
     transition: "all 0.2s",
     background: active ? "rgba(26,86,219,0.9)" : "rgba(0,0,0,0.45)",
     color: active ? "white" : "rgba(255,255,255,0.65)",
-    boxShadow: active ? "0 2px 10px rgba(26,86,219,0.5)" : "none",
+    boxShadow: active ? "0 2px 10px rgba(251,216,93,0.5)" : "none",
   } as React.CSSProperties);
 
   return (
@@ -584,7 +610,7 @@ function HighwayExpandedDialog({
           </div>
 
           {/* Straight Line / Path toggle buttons */}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 mr-12">
             <button
               id="exp-straight-line-btn"
               style={activeBtn(vizMode === "straight")}
@@ -619,12 +645,17 @@ function HighwayExpandedDialog({
         <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pt-10 bg-gradient-to-t from-black/60 to-transparent pointer-events-none z-10">
           <div className="flex flex-wrap gap-2">
             {highwayInfo.map((hw) => {
-              const displayDist = (vizMode === "path" && drivingDistances[hw.ref]) 
+              const displayDist = (vizMode !== "straight" && drivingDistances[hw.ref] !== undefined)
                 ? drivingDistances[hw.ref] 
                 : hw.distanceKm;
               return (
-                <div key={hw.ref} style={{ background: "rgba(26,86,219,0.88)", color: "white", fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 99, whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(26,86,219,0.4)" }}>
-                  {hw.ref} — {displayDist} km away
+                <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.95)", padding: "4px 12px 4px 4px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                  <div style={{ background: "#1a56db", color: "white", fontSize: 12, fontWeight: 900, padding: "4px 10px", borderRadius: 99 }}>
+                    {hw.ref}
+                  </div>
+                  <div style={{ color: "#1a1814", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
+                    {displayDist} km
+                  </div>
                 </div>
               );
             })}

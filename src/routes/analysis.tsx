@@ -10,6 +10,7 @@ import { resolvePoiMeta } from "@/lib/map-styles";
 import { BrochureDialog } from "@/components/BrochureDialog";
 import { MapboxMap } from "@/components/MapboxMap";
 import { MapboxImageDialog } from "@/components/MapboxImageDialog";
+import { MapboxHighwayImageDialog } from "@/components/MapboxHighwayImageDialog";
 import { AutoBrochureLoader } from "@/components/AutoBrochureLoader";
 import { PoiCategorySection } from "@/components/PoiCategorySection";
 import type { PoiRow } from "@/components/PoiCard";
@@ -43,17 +44,20 @@ function AnalysisPage() {
   const setAutoBrochureMode = useReportStore((s) => s.setAutoBrochureMode);
   const [isBrochureOpen, setIsBrochureOpen] = useState(false);
   const [capturedMapImageUrl, setCapturedMapImageUrl] = useState<string>("");
+  const [capturedHighwayMapImageUrl, setCapturedHighwayMapImageUrl] = useState<string>("");
   const [isMapboxImageOpen, setIsMapboxImageOpen] = useState(false);
   const [isMapboxImageTopRightOpen, setIsMapboxImageTopRightOpen] = useState(false);
   const [isMapboxImageNoLabelsOpen, setIsMapboxImageNoLabelsOpen] = useState(false);
-  const [showDistanceRings, setShowDistanceRings] = useState(true);
+  const [isHighwayImageOpen, setIsHighwayImageOpen] = useState(false);
+  const [showDistanceRings, setShowDistanceRings] = useState(false);
   const [highwayInfo, setHighwayInfo] = useState<HighwayInfo[]>([]);
   const [highwayLoading, setHighwayLoading] = useState(false);
+  const [waitingForHighways, setWaitingForHighways] = useState(false);
   const keys = useMapKeys();
 
-  // ── Auto-brochure loader step tracking ──────────────────────────────────────
-  // Steps: 0=loading data, 1=selecting POIs, 2=enabling rings, 3=capturing map, 4=preparing brochure
-  const [autoStep, setAutoStep] = useState(0);
+  const autoBrochureStep = useReportStore((s) => s.autoBrochureStep);
+  const setAutoBrochureStep = useReportStore((s) => s.setAutoBrochureStep);
+  
   // Guard: prevent the auto-select effect from running more than once per session
   const autoPoisSelectedRef = useRef(false);
 
@@ -85,7 +89,7 @@ function AnalysisPage() {
     if (!locationReport || isGenerating) return;
     if (autoPoisSelectedRef.current) return; // only run once
     autoPoisSelectedRef.current = true;
-    setAutoStep(1); // "Selecting key POIs..."
+    setAutoBrochureStep(1); // "Selecting key POIs..."
 
     // groupedPois is already sorted by quality score inside the memo below,
     // but we can replicate the same logic here without depending on that memo.
@@ -129,15 +133,14 @@ function AnalysisPage() {
       }
     });
 
-    // Step 2 → enable distance rings (short delay so markers settle on map)
+    // Step 2 → prepare map view (short delay so markers settle on map)
     setTimeout(() => {
-      setShowDistanceRings(true);
-      setAutoStep(2); // "Enabling distance rings..."
+      setAutoBrochureStep(2); // "Preparing map layout..."
     }, 600);
 
     // Step 3 → open the capture dialog (give map time to render rings)
     setTimeout(() => {
-      setAutoStep(3); // "Capturing map snapshot..."
+      setAutoBrochureStep(3); // "Capturing map snapshot..."
       setIsMapboxImageNoLabelsOpen(true);
     }, 1400);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,12 +159,35 @@ function AnalysisPage() {
   }, [selectedPois]);
 
   const handleGenerateBrochure = (imageDataUrl: string) => {
-    setAutoStep(4); // "Preparing brochure..."
     setCapturedMapImageUrl(imageDataUrl);
-    setIsMapboxImageNoLabelsOpen(false); // Explicitly close the invisible map dialog
+    setIsMapboxImageNoLabelsOpen(false);
+    setIsMapboxImageOpen(false);
+    setIsMapboxImageTopRightOpen(false);
+
+    // After the main map is captured, trigger the highway map capture
+    if (autoBrochureMode) {
+      setAutoBrochureStep(4); // "Mapping highways..."
+      if (highwayLoading) {
+        setWaitingForHighways(true);
+        return;
+      }
+    }
+    setIsHighwayImageOpen(true);
+  };
+
+  useEffect(() => {
+    if (waitingForHighways && !highwayLoading) {
+      setWaitingForHighways(false);
+      setIsHighwayImageOpen(true);
+    }
+  }, [waitingForHighways, highwayLoading]);
+
+  const handleGenerateHighwayMap = (highwayDataUrl: string) => {
+    setCapturedHighwayMapImageUrl(highwayDataUrl);
+    setIsHighwayImageOpen(false);
 
     if (autoBrochureMode) {
-      // Pause so the user can visibly see the final "Preparing brochure" step tick off
+      setAutoBrochureStep(5); // "Preparing brochure..."
       setTimeout(() => {
         setIsBrochureOpen(true);
         // Dismiss the auto loader smoothly
@@ -436,6 +462,7 @@ function AnalysisPage() {
         onClose={() => setIsBrochureOpen(false)}
         reportId={reportId}
         mapImageUrl={capturedMapImageUrl}
+        highwayMapImageUrl={capturedHighwayMapImageUrl}
         sourceCoordinates={coordinates ?? undefined}
         highwayInfo={highwayInfo}
         highwayLoading={highwayLoading}
@@ -455,7 +482,7 @@ function AnalysisPage() {
           token={keys?.mapboxToken}
           selectedPois={selectedPois}
           labelsPosition="on-marker"
-          showDistanceRings={showDistanceRings}
+          showDistanceRings={true}
           onGenerateBrochure={handleGenerateBrochure}
         />
       )}
@@ -470,7 +497,7 @@ function AnalysisPage() {
           token={keys?.mapboxToken}
           selectedPois={selectedPois}
           labelsPosition="top-right"
-          showDistanceRings={showDistanceRings}
+          showDistanceRings={true}
           onGenerateBrochure={handleGenerateBrochure}
         />
       )}
@@ -489,15 +516,28 @@ function AnalysisPage() {
           token={keys?.mapboxToken}
           selectedPois={selectedPois}
           labelsPosition="none"
-          showDistanceRings={showDistanceRings}
+          showDistanceRings={true}
           onGenerateBrochure={handleGenerateBrochure}
           autoBrochureMode={autoBrochureMode}
         />
       )}
 
+      {/* Highway Map Image Capture */}
+      {isHighwayImageOpen && (
+        <MapboxHighwayImageDialog
+          open={isHighwayImageOpen}
+          lat={coordinates.lat}
+          lng={coordinates.lng}
+          token={keys?.mapboxToken}
+          provider={mapProvider}
+          highwayInfo={highwayInfo}
+          onGenerateHighwayMap={handleGenerateHighwayMap}
+        />
+      )}
+
       {/* Auto-brochure animated loading overlay */}
       {autoBrochureMode && (
-        <AutoBrochureLoader step={autoStep} isGenerating={isGenerating} />
+        <AutoBrochureLoader step={autoBrochureStep} isGenerating={isGenerating} />
       )}
 
       {/* ── PLACES LIST (directly below map) ── */}

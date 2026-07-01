@@ -62,6 +62,7 @@ export interface BrochureGeneratorProps {
   onClose: () => void;
   reportId?: string;
   mapImageUrl?: string;
+  highwayMapImageUrl?: string;
   sourceCoordinates?: { lat: number; lng: number };
   highwayInfo?: { ref: string; name: string; distanceKm: number }[];
   highwayLoading?: boolean;
@@ -168,6 +169,168 @@ function TemplateThumbnail({ t, active }: { t: TemplateOption; active: boolean }
   );
 }
 
+// ── Map Image Section ─────────────────────────────────────────────────────────
+
+function MapImageSection({
+  activeSection,
+  mapImageUrl,
+  highwayMapImageUrl,
+  agentPhoto,
+  highwayInfo,
+  drivingDistances,
+  templateId
+}: {
+  activeSection: "standard" | "highway" | "pip";
+  mapImageUrl?: string;
+  highwayMapImageUrl?: string;
+  agentPhoto?: string;
+  highwayInfo?: { ref: string; name: string; distanceKm: number }[];
+  drivingDistances?: Record<string, number>;
+  templateId?: string;
+}) {
+  let pipObjectPosition = "70% center";
+  let pipTransform: string | undefined = undefined;
+  if (activeSection === "pip" && templateId) {
+    // Each template has a different map container shape (width × height).
+    // objectFit:cover scales the image to fill the container, then
+    // objectPosition shifts it. >50% shifts left (shows more right side),
+    // <50% shifts right (shows more left side).
+    // We want the map center (and its radius ring) pushed toward the left
+    // border, so we use values above 50% calibrated per template.
+    if (templateId === "whatsapp")           pipObjectPosition = "70% center"; // confirmed ✓
+    else if (templateId === "instagram-portrait") pipObjectPosition = "70% center"; // same geometry as whatsapp
+    else if (templateId === "instagram-square")   pipObjectPosition = "75% center"; // slightly squarer container
+    else if (templateId === "facebook")           pipObjectPosition = "60% center"; // wide container, less overflow
+    else if (templateId === "a4")                 pipObjectPosition = "75% center"; // large page, good offset
+    else if (templateId === "captured-image")     pipObjectPosition = "62% center"; // near-native ratio, subtle shift
+  }
+
+  const renderBadges = (isPipContext = false) => {
+    if (!highwayInfo || highwayInfo.length === 0 || activeSection === "standard") return null;
+
+    if (activeSection === "pip") {
+      return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", width: "100%", pointerEvents: "none" }}>
+          {highwayInfo.map((hw) => {
+            const dist = drivingDistances?.[hw.ref] !== undefined ? drivingDistances[hw.ref] : hw.distanceKm;
+            return (
+              <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.85)", padding: "2px 8px 2px 2px", borderRadius: 99, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
+                <div style={{ background: "#1a56db", color: "white", fontSize: 10, fontWeight: 900, padding: "3px 8px", borderRadius: 99 }}>
+                  {hw.ref}
+                </div>
+                <div style={{ color: "#1a1814", fontSize: 10, fontWeight: 800, whiteSpace: "nowrap" }}>
+                  {dist} km
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "60px 24px 24px", background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-start", zIndex: 30, pointerEvents: "none" }}>
+        {highwayInfo.map((hw) => {
+          const dist = drivingDistances?.[hw.ref] !== undefined ? drivingDistances[hw.ref] : hw.distanceKm;
+          return (
+            <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.95)", padding: "4px 12px 4px 4px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+              <div style={{ background: "#1a56db", color: "white", fontSize: 12, fontWeight: 900, padding: "4px 10px", borderRadius: 99 }}>
+                {hw.ref}
+              </div>
+              <div style={{ color: "#1a1814", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
+                {dist} km
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+  if (activeSection === "pip") {
+    return (
+      <div style={{ width: "100%", height: "100%", position: "relative", background: "#e8e4db" }}>
+        {/* Main Map */}
+        {mapImageUrl ? (
+          <img 
+            src={mapImageUrl} 
+            crossOrigin={agentPhoto && agentPhoto.startsWith("data:") ? undefined : "anonymous"} 
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: pipObjectPosition, display: "block" }}
+            alt="Main Map" 
+          />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
+            <MapPin size={32} color="#c8b97e" />
+            <span style={{ fontSize: 11, color: "#9e9689" }}>Map capture will appear here</span>
+          </div>
+        )}
+        
+
+
+        {/* PIP Inset (Highway Map) - The Glass Panel */}
+        <div style={{ 
+          position: "absolute", 
+          bottom: "0px", 
+          right: "0px", 
+          width: "38%", 
+          borderRadius: "28px", 
+          padding: "10px",
+          background: "#ffffff",
+          boxShadow: "0 16px 40px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.6)",
+          zIndex: 20,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "8px"
+        }}>
+          <div style={{
+            width: "100%", aspectRatio: "1 / 1", borderRadius: "20px", overflow: "hidden",
+            border: "1px solid rgba(200,185,126,0.6)", background: "#1a1814", position: "relative",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+          }}>
+            {highwayMapImageUrl ? (
+              <img 
+                src={highwayMapImageUrl} 
+                crossOrigin={agentPhoto && agentPhoto.startsWith("data:") ? undefined : "anonymous"} 
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
+                alt="Highway Map Inset" 
+              />
+            ) : (
+               <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
+                 <Route size={24} color="#00c3ff" />
+               </div>
+            )}
+          </div>
+          {renderBadges(true)}
+        </div>
+        {renderBadges(false)}
+      </div>
+    );
+  }
+
+
+  const currentMapImageUrl = activeSection === "standard" ? mapImageUrl : highwayMapImageUrl;
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative", background: activeSection === "standard" ? "#e8e4db" : "#1a1814" }}>
+      {currentMapImageUrl ? (
+        <img 
+          src={currentMapImageUrl} 
+          crossOrigin={agentPhoto && agentPhoto.startsWith("data:") ? undefined : "anonymous"} 
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
+          alt="Map" 
+        />
+      ) : (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
+          {activeSection === "standard" ? <MapPin size={32} color="#c8b97e" /> : <Route size={32} color="#00c3ff" />}
+          <span style={{ fontSize: 11, color: activeSection === "standard" ? "#9e9689" : "rgba(0, 195, 255, 0.8)" }}>
+            {activeSection === "standard" ? "Map capture will appear here" : "Highway Map"}
+          </span>
+        </div>
+      )}
+      {renderBadges()}
+    </div>
+  );
+}
+
 // ── Main BrochureDialog ───────────────────────────────────────────────────────
 
 export function BrochureDialog({
@@ -175,6 +338,7 @@ export function BrochureDialog({
   onClose,
   reportId = "VIC-2026-E0C8",
   mapImageUrl = "",
+  highwayMapImageUrl = "",
   sourceCoordinates,
   highwayInfo = [],
   highwayLoading = false,
@@ -209,8 +373,35 @@ export function BrochureDialog({
   const [headerBg, setHeaderBg]       = useState("#fdfcf5");
   const [textColor, setTextColor]     = useState("#1a1814");
 
-  // ── Format selection ──────────────────────────────────────────────────────
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("instagram-square");
+  // ── Format & Section selection ────────────────────────────────────────────
+  const [activeSection, setActiveSection] = useState<"standard" | "highway" | "pip" | null>("standard");
+
+  // ── Driving Distances ──────────────────────────────────────────────────────
+  const [drivingDistances, setDrivingDistances] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!highwayInfo || highwayInfo.length === 0) return;
+    const token = import.meta.env.VITE_MAPBOX_TOKEN;
+    if (!token) return;
+
+    highwayInfo.forEach(async (hw) => {
+      const closestPoint = (hw as any).closestPoint;
+      if (!closestPoint) return;
+      try {
+        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords.lng},${coords.lat};${closestPoint.lng},${closestPoint.lat}?overview=false&access_token=${token}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const route = data.routes?.[0];
+        if (route && route.distance != null) {
+          const km = +(route.distance / 1000).toFixed(1);
+          setDrivingDistances(prev => ({ ...prev, [hw.ref]: km }));
+        }
+      } catch {
+        // ignore
+      }
+    });
+  }, [highwayInfo, coords]);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("a4");
   const template = TEMPLATES.find((t) => t.id === selectedTemplate)!;
 
   // ── UI expansion states ───────────────────────────────────────────────────
@@ -501,24 +692,19 @@ export function BrochureDialog({
                       </div>
 
                       {/* 2. Map Section */}
-                      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                      <div style={{ flexShrink: 0, height: "46%", display: "flex", flexDirection: "column" }}>
                         <div style={{
                           flex: 1, minHeight: 0, position: "relative",
                           borderRadius: 32, overflow: "hidden",
                           boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
                           border: "4px solid white"
                         }}>
-                          {mapImageUrl ? (
-                            <img src={mapImageUrl}crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ width: "100%", height: "100%", background: "#e8e3da" }} />
-                          )}
+                          <MapImageSection activeSection={activeSection} mapImageUrl={mapImageUrl} highwayMapImageUrl={highwayMapImageUrl} agentPhoto={agentPhoto} highwayInfo={highwayInfo} drivingDistances={drivingDistances} templateId={template.id} />
                           
                           {/* Coordinate badge — top-left */}
                           <div style={{
                             position: "absolute", top: 24, left: 24,
-                            background: "rgba(255,255,255,0.92)",
-                            backdropFilter: "blur(8px)",
+                            background: "#ffffff",
                             borderRadius: 12, padding: "8px 16px",
                             fontSize: 18, fontWeight: 700, color: textColor,
                             fontFamily: "monospace",
@@ -557,7 +743,7 @@ export function BrochureDialog({
                       </div>
 
                       {/* 4. Nearby Highlights */}
-                      <div style={{ flexShrink: 0 }}>
+                      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, paddingLeft: 8 }}>
                           <MapPin size={24} color="#1a1814" />
                           <div style={{ fontSize: 18, fontWeight: 900, color: textColor, letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -654,30 +840,12 @@ export function BrochureDialog({
                         overflow: "hidden",
                         background: "#e8e4db"
                       }}>
-                        {mapImageUrl ? (
-                          <img
-                            src={mapImageUrl}
-                            alt="Property map"
-                            crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
-                            style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "top", display: "block" }}
-                          />
-                        ) : (
-                          <div style={{
-                            width: "100%", height: "100%",
-                            background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            flexDirection: "column", gap: 8,
-                          }}>
-                            <MapPin size={32} color="#c8b97e" />
-                            <span style={{ fontSize: 11, color: "#9e9689" }}>Map capture will appear here</span>
-                          </div>
-                        )}
+                        <MapImageSection activeSection={activeSection} mapImageUrl={mapImageUrl} highwayMapImageUrl={highwayMapImageUrl} agentPhoto={agentPhoto} highwayInfo={highwayInfo} drivingDistances={drivingDistances} templateId={template.id} />
                         
                         {/* Coordinate badge */}
                         <div style={{
                           position: "absolute", top: 16, right: 16, // Moved to top-right to avoid any visual collision with top-left badge
-                          background: "rgba(255,255,255,0.92)",
-                          backdropFilter: "blur(8px)",
+                          background: "#ffffff",
                           borderRadius: 10, padding: "6px 12px",
                           fontSize: 14, fontWeight: 700, color: textColor,
                           fontFamily: "monospace",
@@ -852,7 +1020,8 @@ export function BrochureDialog({
                             borderRadius: 20,
                             border: `2px solid ${accentColor}`,
                             padding: "16px",
-                            gap: 16
+                            gap: 16,
+                            marginTop: "auto"
                           }}>
                             {/* Left Side: Agent Info */}
                             <div style={{
@@ -945,30 +1114,12 @@ export function BrochureDialog({
                           overflow: "hidden",
                           background: "#e8e4db",
                         }}>
-                          {mapImageUrl ? (
-                            <img
-                              src={mapImageUrl}
-                              alt="Property map"
-                              crossOrigin={agentPhoto.startsWith("data:") ? undefined : "anonymous"}
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                            />
-                          ) : (
-                            <div style={{
-                              width: "100%", height: "100%",
-                              background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              flexDirection: "column", gap: 8,
-                            }}>
-                              <MapPin size={32} color="#c8b97e" />
-                              <span style={{ fontSize: 11, color: "#9e9689" }}>Map capture will appear here</span>
-                            </div>
-                          )}
+                          <MapImageSection activeSection={activeSection} mapImageUrl={mapImageUrl} highwayMapImageUrl={highwayMapImageUrl} agentPhoto={agentPhoto} highwayInfo={highwayInfo} drivingDistances={drivingDistances} templateId={template.id} />
                           
                           {/* Coordinate badge */}
                           <div style={{
                             position: "absolute", top: 16, right: 16, // Moved to right to avoid overlapping premium badge
-                            background: "rgba(255,255,255,0.92)",
-                            backdropFilter: "blur(8px)",
+                            background: "#ffffff",
                             borderRadius: 10, padding: "6px 12px",
                             fontSize: 14, fontWeight: 700, color: textColor,
                             fontFamily: "monospace",
@@ -1111,8 +1262,8 @@ export function BrochureDialog({
 
                             {/* Agent Details */}
                             <div style={{
-                              flex: 1,
-                              minHeight: 0,
+                              flexShrink: 0,
+                              marginTop: "auto",
                               background: "#fffbf0",
                               borderRadius: 20,
                               border: `2px solid ${accentColor}`,
@@ -1230,17 +1381,10 @@ export function BrochureDialog({
 
                         {/* Map Image */}
                         <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#e8e4db" }}>
-                          {mapImageUrl ? (
-                            <img src={mapImageUrl}crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                          ) : (
-                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
-                              <MapPin size={48} color="#c8b97e" />
-                              <span style={{ fontSize: 14, color: "#9e9689" }}>Map capture will appear here</span>
-                            </div>
-                          )}
+                          <MapImageSection activeSection={activeSection} mapImageUrl={mapImageUrl} highwayMapImageUrl={highwayMapImageUrl} agentPhoto={agentPhoto} highwayInfo={highwayInfo} drivingDistances={drivingDistances} templateId={template.id} />
                           <div style={{
-                            position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.92)",
-                            backdropFilter: "blur(8px)", borderRadius: 10, padding: "6px 12px",
+                            position: "absolute", top: 16, right: 16, background: "#ffffff",
+                            borderRadius: 10, padding: "6px 12px",
                             fontSize: 14, fontWeight: 700, color: textColor, fontFamily: "monospace",
                             boxShadow: "0 4px 16px rgba(0,0,0,0.12)", pointerEvents: "none",
                           }}>
@@ -1276,7 +1420,7 @@ export function BrochureDialog({
                         </div>
 
                         {/* Key Highlights */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                             <MapPin size={16} color="#1a1814" />
                             <div style={{ fontSize: 13, fontWeight: 900, color: textColor, letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -1310,7 +1454,7 @@ export function BrochureDialog({
 
                         {/* Agent Section */}
                         <div style={{
-                          flex: 1, background: "#fffbf0", borderRadius: 16,
+                          flexShrink: 0, marginTop: "auto", background: "#fffbf0", borderRadius: 16,
                           border: `2px solid ${accentColor}`, padding: "16px",
                           display: "flex", flexDirection: "row", alignItems: "stretch",
                         }}>
@@ -1412,17 +1556,10 @@ export function BrochureDialog({
 
                         {/* Map Section — fills the remaining height */}
                         <div style={{ flex: 1, minHeight: 0, position: "relative", borderRadius: 32, overflow: "hidden", boxShadow: "0 12px 48px rgba(0,0,0,0.08)", border: "6px solid white" }}>
-                          {mapImageUrl ? (
-                            <img src={mapImageUrl}crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
-                              <MapPin size={48} color="#c8b97e" />
-                              <span style={{ fontSize: 20, color: "#9e9689" }}>Map capture will appear here</span>
-                            </div>
-                          )}
+                          <MapImageSection activeSection={activeSection} mapImageUrl={mapImageUrl} highwayMapImageUrl={highwayMapImageUrl} agentPhoto={agentPhoto} highwayInfo={highwayInfo} drivingDistances={drivingDistances} templateId={template.id} />
                           <div style={{
                             position: "absolute", top: 24, left: 24,
-                            background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
+                            background: "#ffffff",
                             borderRadius: 14, padding: "10px 20px",
                             fontSize: 20, fontWeight: 700, color: textColor, fontFamily: "monospace",
                             boxShadow: "0 6px 24px rgba(0,0,0,0.12)", pointerEvents: "none",
@@ -1501,7 +1638,7 @@ export function BrochureDialog({
                                         {hw.ref}
                                       </span>
                                       <span style={{ fontSize: 26, fontWeight: 700, color: "#1a1814" }}>
-                                        {hw.distanceKm} km
+                                        {drivingDistances[hw.ref] !== undefined ? drivingDistances[hw.ref] : hw.distanceKm} km
                                       </span>
                                     </div>
                                   ))}
@@ -1554,7 +1691,8 @@ export function BrochureDialog({
                         <div style={{
                           background: "#fffbf0", borderRadius: 28,
                           border: `3px solid ${accentColor}`,
-                          padding: "36px 40px", flexShrink: 0
+                          padding: "36px 40px", flexShrink: 0,
+                          marginTop: "auto"
                         }}>
                           <div style={{ textAlign: "center", marginBottom: 24, paddingBottom: 24, borderBottom: "2px solid #ede8de" }}>
                             <div style={{ fontSize: 22, color: "#5a5248", marginBottom: 4, fontStyle: "italic" }}>Interested in this property?</div>
@@ -1587,14 +1725,7 @@ export function BrochureDialog({
 
                   {template.id === "captured-image" && (
                     <div style={{ position: "relative", width: "100%", height: "100%", background: "#eceae3" }}>
-                      {mapImageUrl ? (
-                        <img src={mapImageUrl} crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #e8e3da 0%, #d4ccbf 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
-                          <MapPin size={48} color="#c8b97e" />
-                          <span style={{ fontSize: 20, color: "#9e9689" }}>Map capture will appear here</span>
-                        </div>
-                      )}
+                      <MapImageSection activeSection={activeSection} mapImageUrl={mapImageUrl} highwayMapImageUrl={highwayMapImageUrl} agentPhoto={agentPhoto} highwayInfo={highwayInfo} drivingDistances={drivingDistances} templateId={template.id} />
                     </div>
                   )}
 
@@ -1673,8 +1804,7 @@ export function BrochureDialog({
                       {/* Coordinate badge — top-left */}
                       <div style={{
                         position: "absolute", top: 10, left: 10,
-                        background: "rgba(255,255,255,0.92)",
-                        backdropFilter: "blur(4px)",
+                        background: "#ffffff",
                         borderRadius: 6, padding: "4px 10px",
                         fontSize: 10, fontWeight: 700, color: textColor,
                         fontFamily: "monospace",
@@ -1871,55 +2001,202 @@ export function BrochureDialog({
                 {/* Scrollable content */}
                 <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "14px 14px 0" }}>
 
-                  {/* ── Choose Template ─────────────────────────────────── */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{
-                      fontSize: 8.5, letterSpacing: "0.18em", color: "#9e9689",
-                      textTransform: "uppercase", fontWeight: 700, marginBottom: 8,
-                    }}>
-                      Choose Template
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {TEMPLATES.map((t) => {
-                        const active = selectedTemplate === t.id;
-                        return (
-                          <button
-                            key={t.id}
-                            onClick={() => setSelectedTemplate(t.id)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              padding: "8px 10px", borderRadius: 10,
-                              border: active ? `1.5px solid ${accentColor}` : "1.5px solid #e8e3d8",
-                              background: active ? "#fef9ec" : "white",
-                              cursor: "pointer", textAlign: "left",
-                              transition: "all 0.12s",
-                              position: "relative",
-                            }}
-                          >
-                            <TemplateThumbnail t={t} active={active} />
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                              <span style={{ color: active ? accentColor : "#9e9689", flexShrink: 0 }}>{t.icon}</span>
-                              <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? "#1a1814" : "#3a3228", lineHeight: 1.2 }}>{t.label}</div>
-                                <div style={{ fontSize: 9, color: "#9e9689" }}>{t.sub}</div>
-                              </div>
-                            </div>
-                            {active && (
-                              <div style={{
-                                width: 18, height: 18, borderRadius: "50%",
-                                background: accentColor,
-                                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                              }}>
-                                <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                                  <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  {/* ── Choose Template Accordion ─────────────────────────────────── */}
+                  <div style={{ marginBottom: 12 }}>
+                    <button
+                      onClick={() => setActiveSection(activeSection === "standard" ? null : "standard")}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "8px 4px", background: "transparent", border: "none", cursor: "pointer",
+                        color: activeSection === "standard" ? "#1a1814" : "#9e9689"
+                      }}
+                    >
+                      <div style={{ fontSize: 8.5, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700 }}>
+                        Choose Template
+                      </div>
+                      {activeSection === "standard" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {activeSection === "standard" && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                            {TEMPLATES.map((t) => {
+                              const active = selectedTemplate === t.id;
+                              return (
+                                <button
+                                  key={t.id}
+                                  onClick={() => setSelectedTemplate(t.id)}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    padding: "8px 10px", borderRadius: 10,
+                                    border: active ? `1.5px solid ${accentColor}` : "1.5px solid #e8e3d8",
+                                    background: active ? "#fef9ec" : "white",
+                                    cursor: "pointer", textAlign: "left",
+                                    transition: "all 0.12s",
+                                    position: "relative",
+                                  }}
+                                >
+                                  <TemplateThumbnail t={t} active={active} />
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                                    <span style={{ color: active ? accentColor : "#9e9689", flexShrink: 0 }}>{t.icon}</span>
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? "#1a1814" : "#3a3228", lineHeight: 1.2 }}>{t.label}</div>
+                                      <div style={{ fontSize: 9, color: "#9e9689" }}>{t.sub}</div>
+                                    </div>
+                                  </div>
+                                  {active && (
+                                    <div style={{ width: 18, height: 18, borderRadius: "50%", background: accentColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                      <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                        <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
+
+                  {/* ── Highway Access Accordion ─────────────────────────────────── */}
+                  <div style={{ marginBottom: 16 }}>
+                    <button
+                      onClick={() => setActiveSection(activeSection === "highway" ? null : "highway")}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "8px 4px", background: "transparent", border: "none", cursor: "pointer",
+                        color: activeSection === "highway" ? "#1a1814" : "#9e9689"
+                      }}
+                    >
+                      <div style={{ fontSize: 8.5, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700 }}>
+                        Highway Access
+                      </div>
+                      {activeSection === "highway" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {activeSection === "highway" && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                            {TEMPLATES.map((t) => {
+                              const active = selectedTemplate === t.id;
+                              return (
+                                <button
+                                  key={t.id}
+                                  onClick={() => setSelectedTemplate(t.id)}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    padding: "8px 10px", borderRadius: 10,
+                                    border: active ? `1.5px solid ${accentColor}` : "1.5px solid #e8e3d8",
+                                    background: active ? "#fef9ec" : "white",
+                                    cursor: "pointer", textAlign: "left",
+                                    transition: "all 0.12s",
+                                    position: "relative",
+                                  }}
+                                >
+                                  <TemplateThumbnail t={t} active={active} />
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                                    <span style={{ color: active ? accentColor : "#9e9689", flexShrink: 0 }}>{t.icon}</span>
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? "#1a1814" : "#3a3228", lineHeight: 1.2 }}>{t.label}</div>
+                                      <div style={{ fontSize: 9, color: "#9e9689" }}>{t.sub}</div>
+                                    </div>
+                                  </div>
+                                  {active && (
+                                    <div style={{ width: 18, height: 18, borderRadius: "50%", background: accentColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                      <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                        <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* ── Picture-in-Picture Overlay Accordion ───────────────────── */}
+                  <div style={{ marginBottom: 16 }}>
+                    <button
+                      onClick={() => setActiveSection(activeSection === "pip" ? null : "pip")}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "8px 4px", background: "transparent", border: "none", cursor: "pointer",
+                        color: activeSection === "pip" ? "#1a1814" : "#9e9689"
+                      }}
+                    >
+                      <div style={{ fontSize: 8.5, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700 }}>
+                        Picture-in-Picture Overlay
+                      </div>
+                      {activeSection === "pip" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {activeSection === "pip" && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                            {TEMPLATES.map((t) => {
+                              const active = selectedTemplate === t.id;
+                              return (
+                                <button
+                                  key={t.id}
+                                  onClick={() => setSelectedTemplate(t.id)}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    padding: "8px 10px", borderRadius: 10,
+                                    border: active ? `1.5px solid ${accentColor}` : "1.5px solid #e8e3d8",
+                                    background: active ? "#fef9ec" : "white",
+                                    cursor: "pointer", textAlign: "left",
+                                    transition: "all 0.12s",
+                                    position: "relative",
+                                  }}
+                                >
+                                  <TemplateThumbnail t={t} active={active} />
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                                    <span style={{ color: active ? accentColor : "#9e9689", flexShrink: 0 }}>{t.icon}</span>
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? "#1a1814" : "#3a3228", lineHeight: 1.2 }}>{t.label}</div>
+                                      <div style={{ fontSize: 9, color: "#9e9689" }}>{t.sub}</div>
+                                    </div>
+                                  </div>
+                                  {active && (
+                                    <div style={{ width: 18, height: 18, borderRadius: "50%", background: accentColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                      <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                        <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+
 
                   <div style={{ height: 1, background: "#e8e3d8", marginBottom: 14 }} />
 
@@ -2092,8 +2369,8 @@ export function BrochureDialog({
                 }}>
                   {/* Primary Download */}
                   <button
-                    id="brochure-download-png"
-                    onClick={() => handleDownload(template.id === "a4" ? "pdf" : "png")}
+                    id="brochure-download-primary"
+                    onClick={() => handleDownload("jpg")}
                     disabled={dlState.startsWith("loading")}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "center",
@@ -2115,12 +2392,14 @@ export function BrochureDialog({
                     onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}
                   >
                     {dlState.startsWith("loading") ? <Spinner color="#1a1814" /> : <Download size={15} />}
-                    {dlState.startsWith("done") ? "✓ Downloaded!" : "Download"}
+                    {dlState.startsWith("done") 
+                      ? "Downloaded!" 
+                      : "Download"}
                   </button>
 
                   {/* Secondary format buttons */}
                   <div style={{ display: "flex", gap: 5 }}>
-                    {(["jpg", "pdf"] as const).map((fmt) => (
+                    {(template.id === "a4" ? (["pdf", "png"] as const) : (["png", "pdf"] as const)).map((fmt) => (
                       <button
                         key={fmt}
                         id={`brochure-download-${fmt}`}
@@ -2131,14 +2410,14 @@ export function BrochureDialog({
                           gap: 5, padding: "8px 6px", borderRadius: 9,
                           border: "1.5px solid #e8e3d8", background: "white",
                           cursor: dlState.startsWith("loading") ? "not-allowed" : "pointer",
-                          fontSize: 10, fontWeight: 600, color: "#5a5248",
+                          fontSize: 10, fontWeight: 700, color: "#5a5248",
                           transition: "all 0.15s",
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f4ef"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "white"; }}
                       >
                         {dlState === `loading-${fmt}` ? <Spinner size={10} color="#5a5248" /> : <Download size={10} color="#5a5248" />}
-                        {fmt.toUpperCase()}
+                        {fmt === "pdf" ? "High-Res (PDF)" : "High-Res (PNG)"}
                       </button>
                     ))}
                   </div>

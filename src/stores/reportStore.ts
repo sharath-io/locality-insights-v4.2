@@ -26,6 +26,8 @@ interface ReportState {
   /** When true the analysis page auto-selects top 2 POIs per category, captures the map,
    *  and opens the brochure dialog — showing a hybrid loading overlay during the flow. */
   autoBrochureMode: boolean;
+  /** Tracks the current step of the auto-brochure generation flow */
+  autoBrochureStep: number;
 
   setInputUrl: (v: string) => void;
   setCoordinates: (v: { lat: number; lng: number } | null) => void;
@@ -40,6 +42,7 @@ interface ReportState {
   clearAllPois: () => void;
   setHoveredPoi: (poi: SelectedPoiEntry | null) => void;
   setAutoBrochureMode: (v: boolean) => void;
+  setAutoBrochureStep: (v: number) => void;
   /** Wipe all analysis data (called when leaving the analysis page) */
   resetAnalysis: () => void;
 }
@@ -54,6 +57,7 @@ export const useReportStore = create<ReportState>((set) => ({
   selectedPois: {},
   hoveredPoi: null,
   autoBrochureMode: false,
+  autoBrochureStep: 0,
 
   setInputUrl: (inputUrl) => set({ inputUrl }),
   setCoordinates: (coordinates) => set({ coordinates }),
@@ -62,6 +66,7 @@ export const useReportStore = create<ReportState>((set) => ({
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setMapProvider: (mapProvider) => set({ mapProvider }),
   setAutoBrochureMode: (autoBrochureMode) => set({ autoBrochureMode }),
+  setAutoBrochureStep: (autoBrochureStep) => set({ autoBrochureStep }),
 
   togglePoi: (poi) =>
     set((state) => {
@@ -92,5 +97,6 @@ export const useReportStore = create<ReportState>((set) => ({
       // double-invoke), which would wipe the flag before the auto-flow can read it.
       // autoBrochureMode is reset explicitly via setAutoBrochureMode(false) once the
       // flow completes or is cancelled.
+      autoBrochureStep: 0,
     }),
 }));

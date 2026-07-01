@@ -6,13 +6,14 @@
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Sparkles, Camera, CircleDot, Map as MapIcon } from "lucide-react";
+import { MapPin, Sparkles, Camera, CircleDot, Map as MapIcon, Route as RouteIcon } from "lucide-react";
 
 const AUTO_BROCHURE_STEPS = [
   { label: "Loading vicinity data", Icon: MapIcon },
   { label: "Selecting key POIs", Icon: MapPin },
-  { label: "Enabling distance rings", Icon: CircleDot },
+  { label: "Preparing map layout", Icon: CircleDot },
   { label: "Capturing map snapshot", Icon: Camera },
+  { label: "Mapping highways", Icon: RouteIcon },
   { label: "Preparing brochure", Icon: Sparkles },
 ];
 
