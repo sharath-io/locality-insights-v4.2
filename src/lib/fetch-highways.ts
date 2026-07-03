@@ -56,20 +56,40 @@ export async function fetchNearestHighways(lat: number, lng: number): Promise<Hi
 way["highway"~"^(motorway|trunk)$"]["ref"](around:15000,${lat},${lng});
 out body geom;
 `;
-  try {
-    const res = await fetch("https://lz4.overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: `data=${encodeURIComponent(query.trim())}`,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json"
+  const endpoints = [
+    "https://lz4.overpass-api.de/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+    "https://z.overpass-api.de/api/interpreter",
+  ];
+
+  let json: any = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: `data=${encodeURIComponent(query.trim())}`,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Accept": "application/json"
+        }
+      });
+      
+      if (res.ok) {
+        json = await res.json();
+        break; // Successfully fetched, exit loop
+      } else {
+        console.warn(`Overpass API failed on ${endpoint}:`, res.status, res.statusText);
       }
-    });
-    if (!res.ok) {
-      console.error("Overpass API Error:", res.status, res.statusText, await res.text());
-      return [];
+    } catch (e) {
+      console.warn(`Overpass API error on ${endpoint}:`, e);
     }
-    const json = await res.json() as { elements: Array<{ tags?: { ref?: string; name?: string }; geometry?: Array<{ lat: number; lon: number }> }> };
+  }
+
+  if (!json || !json.elements) {
+    console.error("All Overpass API endpoints failed.");
+    return [];
+  }
 
     const highwaysMap = new Map<string, HighwayInfo>();
 
@@ -111,9 +131,5 @@ out body geom;
     return Array.from(highwaysMap.values())
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, 3);
-  } catch (e) {
-    console.error("fetchNearestHighways exception:", e);
-    return [];
-  }
 }
 

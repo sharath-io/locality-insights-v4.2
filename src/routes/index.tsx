@@ -4,7 +4,7 @@ import LandingPage from "@/components/LandingPage";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "LocateIQ — Locality Analysis for Real Estate" },
+      { title: "LocateIQ — Location Intelligence for Real Estate" },
       {
         name: "description",
         content:

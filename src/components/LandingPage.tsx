@@ -45,21 +45,21 @@ const TransitIcons = (props: any) => (
 );
 
 const CATEGORIES: Category[] = [
-  { id: "hospitals",        label: "HOSPITALS",       Icon: Hospital },
-  { id: "business_hubs",    label: "BUSINESS HUBS",   Icon: Briefcase },
-  { id: "petrol_pumps",     label: "PETROL PUMPS",    Icon: Fuel },
-  { id: "temples",          label: "TEMPLES",         Icon: Landmark },
-  { id: "restaurants",      label: "RESTAURANTS",     Icon: UtensilsCrossed },
-  { id: "shopping",         label: "SHOPPING AREAS",  Icon: ShoppingBag },
-  { id: "education",        label: "EDUCATION",       Icon: GraduationCap },
-  { id: "transit",          label: "PUBLIC TRANSIT",  Icon: TransitIcons as unknown as LucideIcon },
-  { id: "attractions",      label: "ATTRACTIONS",     Icon: Camera },
-  { id: "supermarkets",     label: "SUPERMARKETS",    Icon: ShoppingCart },
-  { id: "fitness_centers",  label: "FITNESS CENTERS", Icon: Dumbbell },
-  { id: "pharmacies",       label: "PHARMACIES",      Icon: Pill },
-  { id: "cafes",            label: "CAFES",           Icon: Coffee },
-  { id: "banks_atms",       label: "BANKS & ATMs",    Icon: Banknote },
-  { id: "entertainment",    label: "ENTERTAINMENT",   Icon: Clapperboard },
+  { id: "hospitals", label: "HOSPITALS", Icon: Hospital },
+  { id: "business_hubs", label: "BUSINESS HUBS", Icon: Briefcase },
+  { id: "petrol_pumps", label: "PETROL PUMPS", Icon: Fuel },
+  { id: "temples", label: "TEMPLES", Icon: Landmark },
+  { id: "restaurants", label: "RESTAURANTS", Icon: UtensilsCrossed },
+  { id: "shopping", label: "SHOPPING AREAS", Icon: ShoppingBag },
+  { id: "education", label: "EDUCATION", Icon: GraduationCap },
+  { id: "transit", label: "PUBLIC TRANSIT", Icon: TransitIcons as unknown as LucideIcon },
+  { id: "attractions", label: "ATTRACTIONS", Icon: Camera },
+  { id: "supermarkets", label: "SUPERMARKETS", Icon: ShoppingCart },
+  { id: "fitness_centers", label: "FITNESS CENTERS", Icon: Dumbbell },
+  { id: "pharmacies", label: "PHARMACIES", Icon: Pill },
+  { id: "cafes", label: "CAFES", Icon: Coffee },
+  { id: "banks_atms", label: "BANKS & ATMs", Icon: Banknote },
+  { id: "entertainment", label: "ENTERTAINMENT", Icon: Clapperboard },
 ];
 
 const ALL_IDS = CATEGORIES.map((c) => c.id);
@@ -140,13 +140,15 @@ export default function LandingPage() {
         <div>
           <h1
             className="font-heading font-bold leading-[1.05] text-white"
-            style={{ fontSize: "clamp(36px, 5vw, 52px)" }}
+            style={{ fontSize: "clamp(32px, 5vw, 46px)", letterSpacing: "-0.01em" }}
           >
-            Locality
+            LocateIQ
             <br />
-            Analysis
+            <span className="text-[clamp(16px,2.5vw,22px)] font-light text-white/80 mt-3 block tracking-wide underline underline-offset-[6px] decoration-[var(--gold)]/60 decoration-1">
+              Location Intelligence for Real Estate
+            </span>
           </h1>
-          <p className="mt-6 font-light text-white/70 text-base md:text-lg max-w-md leading-relaxed">
+          <p className="mt-8 font-light text-white/70 text-base md:text-lg max-w-md leading-relaxed">
             Generate intelligent vicinity insights from any Google Maps location.
           </p>
 
@@ -162,7 +164,7 @@ export default function LandingPage() {
               <input
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
-                placeholder="Paste Google Maps link or Lat, Lng..."
+                placeholder="Paste Google Maps link with Lat, Lng..."
                 className="w-full bg-white/5 border border-white/15 rounded-lg pl-11 pr-4 py-3.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--gold)]/60 transition"
               />
             </div>
@@ -239,11 +241,10 @@ export default function LandingPage() {
                 <button
                   key={b.label}
                   onClick={b.action}
-                  className={`text-[10px] tracking-[0.12em] sm:tracking-[0.15em] px-3 py-1.5 border rounded transition-colors cursor-pointer ${
-                    b.isActive
+                  className={`text-[10px] tracking-[0.12em] sm:tracking-[0.15em] px-3 py-1.5 border rounded transition-colors cursor-pointer ${b.isActive
                       ? "border-[var(--navy)] bg-[var(--navy)] text-white"
                       : "border-[var(--navy)]/20 text-[var(--navy)] hover:border-[var(--navy)] hover:bg-[var(--navy)] hover:text-white"
-                  }`}
+                    }`}
                 >
                   {b.label}
                 </button>
@@ -264,21 +265,18 @@ export default function LandingPage() {
                 transition={{ delay: i * 0.03, duration: 0.3, ease: "easeOut" }}
                 onClick={() => toggle(cat.id)}
                 whileHover={{ y: -1 }}
-                className={`px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${
-                  ["transit", "education", "attractions"].includes(cat.id) ? "row-span-2 flex flex-col justify-center gap-4" : "flex items-center gap-3"
-                } ${
-                  isSelected
+                className={`px-4 py-3.5 rounded-lg border-2 text-left transition-all cursor-pointer ${["transit", "education", "attractions"].includes(cat.id) ? "row-span-2 flex flex-col justify-center gap-4" : "flex items-center gap-3"
+                  } ${isSelected
                     ? "border-[var(--gold)] bg-[var(--navy)]/[0.04] shadow-[0_6px_18px_-8px_rgba(15,30,53,0.35)]"
                     : "border-[#e8e2d4] bg-white hover:border-[var(--navy)]/40 hover:shadow-sm"
-                }`}
+                  }`}
               >
                 {cat.id === "transit" ? (
                   <>
                     <div className="flex items-center gap-3">
                       <span
-                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
-                          isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
-                        }`}
+                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
+                          }`}
                       >
                         {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
                       </span>
@@ -301,9 +299,8 @@ export default function LandingPage() {
                   <>
                     <div className="flex items-center gap-3">
                       <span
-                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
-                          isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
-                        }`}
+                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
+                          }`}
                       >
                         {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
                       </span>
@@ -326,9 +323,8 @@ export default function LandingPage() {
                   <>
                     <div className="flex items-center gap-3">
                       <span
-                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
-                          isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
-                        }`}
+                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${isSelected ? "bg-[var(--navy)] border-[var(--navy)]" : "border-[#cfc7b3] bg-white"
+                          }`}
                       >
                         {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
                       </span>
@@ -354,11 +350,10 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <span
-                      className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${
-                        isSelected
+                      className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border-2 transition-colors ${isSelected
                           ? "bg-[var(--navy)] border-[var(--navy)]"
                           : "border-[#cfc7b3] bg-white"
-                      }`}
+                        }`}
                     >
                       {isSelected && <Check size={12} className="text-[var(--gold)]" strokeWidth={3} />}
                     </span>
@@ -368,9 +363,8 @@ export default function LandingPage() {
                       strokeWidth={isSelected ? 2.25 : 1.75}
                     />
                     <span
-                      className={`text-[11px] font-semibold tracking-wider ${
-                        isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"
-                      }`}
+                      className={`text-[11px] font-semibold tracking-wider ${isSelected ? "text-[var(--navy)]" : "text-[var(--navy)]/80"
+                        }`}
                     >
                       {cat.label}
                     </span>
