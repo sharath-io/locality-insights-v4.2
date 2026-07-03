@@ -192,7 +192,7 @@ function AnalysisPage() {
         setIsBrochureOpen(true);
         // Dismiss the auto loader smoothly
         setTimeout(() => setAutoBrochureMode(false), 300);
-      }, 1500);
+      }, 300);
     } else {
       setIsBrochureOpen(true);
     }
@@ -388,7 +388,7 @@ function AnalysisPage() {
             <button
               id="show-distance-rings-btn"
               onClick={() => setShowDistanceRings((v) => !v)}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm cursor-pointer"
               style={{
                 background: showDistanceRings
                   ? "linear-gradient(135deg, #1a56db15 0%, #1a56db08 100%)"
@@ -408,7 +408,7 @@ function AnalysisPage() {
                 <button
                   id="capture-mapbox-image-btn"
                   onClick={() => setIsMapboxImageOpen(true)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm cursor-pointer"
                   style={{
                     background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
                     borderColor: "#e8e2d4",
@@ -423,7 +423,7 @@ function AnalysisPage() {
                 <button
                   id="capture-labels-separately-btn"
                   onClick={() => setIsMapboxImageTopRightOpen(true)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm cursor-pointer"
                   style={{
                     background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
                     borderColor: "#e8e2d4",
@@ -438,12 +438,12 @@ function AnalysisPage() {
                 <button
                   id="capture-no-labels-btn"
                   onClick={() => setIsMapboxImageNoLabelsOpen(true)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[11px] sm:text-[13px] font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border hover:shadow-md shadow-sm"
+                  className="flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] font-bold transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-md hover:shadow-xl border cursor-pointer"
                   style={{
-                    background: "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)",
-                    borderColor: "#e8e2d4",
-                    color: "var(--navy)",
-                    letterSpacing: "-0.01em",
+                    background: "linear-gradient(135deg, var(--navy) 0%, #2a3441 100%)",
+                    borderColor: "rgba(255,255,255,0.1)",
+                    color: "white",
+                    letterSpacing: "0.01em",
                   }}
                   title="Capture image with icons only — no text labels"
                 >

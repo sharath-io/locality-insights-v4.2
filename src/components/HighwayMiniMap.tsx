@@ -98,10 +98,10 @@ function drawStraightLines(
     });
 
     const el = document.createElement("div");
-    el.style.cssText = `display:flex;align-items:center;gap:4px;pointer-events:none;`;
+    el.style.cssText = `position:relative;width:0;height:0;pointer-events:none;`;
     el.innerHTML = `
-      <div style="width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
-      <div style="color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
+      <div style="position:absolute;top:50%;left:12px;transform:translateY(-50%);color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
     `;
     const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
       .setLngLat([hw.closestPoint.lng, hw.closestPoint.lat])
@@ -128,10 +128,10 @@ async function drawRoutes(
   // 1. Draw markers immediately so the user sees highway locations without waiting for the route fetch
   highways.forEach((hw) => {
     const el = document.createElement("div");
-    el.style.cssText = `display:flex;align-items:center;gap:4px;pointer-events:none;`;
+    el.style.cssText = `position:relative;width:0;height:0;pointer-events:none;`;
     el.innerHTML = `
-      <div style="width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
-      <div style="color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
+      <div style="position:absolute;top:50%;left:12px;transform:translateY(-50%);color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
     `;
     const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
       .setLngLat([hw.closestPoint.lng, hw.closestPoint.lat])
@@ -483,10 +483,10 @@ function HighwayExpandedDialog({
     addSitePin(map, lng, lat);
     highwayInfo.forEach((hw) => {
       const el = document.createElement("div");
-      el.style.cssText = `display:flex;align-items:center;gap:4px;pointer-events:none;`;
+      el.style.cssText = `position:relative;width:0;height:0;pointer-events:none;`;
       el.innerHTML = `
-        <div style="width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
-        <div style="color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;background:#1a56db;border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>
+        <div style="position:absolute;top:50%;left:12px;transform:translateY(-50%);color:#1a56db;font-size:12px;font-weight:800;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;white-space:nowrap;">${hw.ref}</div>
       `;
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
         .setLngLat([hw.closestPoint.lng, hw.closestPoint.lat])
@@ -672,5 +672,5 @@ function fitToHighways(map: mapboxgl.Map, lat: number, lng: number, highways: Hi
   if (highways.length === 0) return;
   const bounds = new mapboxgl.LngLatBounds([lng, lat], [lng, lat]);
   highways.forEach((hw) => bounds.extend([hw.closestPoint.lng, hw.closestPoint.lat]));
-  map.fitBounds(bounds, { padding, maxZoom: 12, duration: 900 });
+  map.fitBounds(bounds, { padding, maxZoom: 13.5, duration: 900 });
 }

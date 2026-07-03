@@ -26,6 +26,7 @@ export interface LocationReport {
   pois: POIGroup[];
   bbox: BBox;
   reportId: string;
+  quotaExceeded?: boolean;
 }
 
 export interface RoadSegment {

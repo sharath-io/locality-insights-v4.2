@@ -82,7 +82,7 @@ export const nearbySearch = createServerFn({ method: "POST" })
     console.log("SERVER: API Key defined:", !!apiKey);
     if (!apiKey) throw new Error("GOOGLE_PLACES_KEY not configured");
 
-    const groups: POIGroup[] = await Promise.all(
+    const groups = await Promise.all(
       categories.map(async (cat) => {
         const mappedType = CATEGORY_TO_TYPE[cat];
         if (!mappedType) return { type: cat, items: [] as POIItem[] };
@@ -113,8 +113,9 @@ export const nearbySearch = createServerFn({ method: "POST" })
           });
 
           if (!res.ok) {
+            const is429 = res.status === 429;
             console.error(`Places API error for ${cat}:`, res.status, await res.text());
-            return { type: cat, items: [] };
+            return { type: cat, items: [], is429 };
           }
 
           const json = (await res.json()) as {
@@ -190,11 +191,14 @@ export const nearbySearch = createServerFn({ method: "POST" })
 
     const siteLabel = await getFormattedAddress(lat, lng);
 
+    const quotaExceeded = groups.some(g => (g as any).is429 === true);
+
     return {
       site: { lat, lng, label: siteLabel },
       pois: groups,
       bbox,
       reportId: crypto.randomUUID(),
+      quotaExceeded,
     };
   });
 

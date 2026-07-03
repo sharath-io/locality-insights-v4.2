@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "react-toastify";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { useReportStore } from "@/stores/reportStore";
 import { nearbySearch } from "@/lib/nearby-search.functions";
 
@@ -10,6 +11,7 @@ export function usePlacesSearch() {
   const setLocationReport = useReportStore((s) => s.setLocationReport);
   const setIsGenerating = useReportStore((s) => s.setIsGenerating);
   const fetchNearby = useServerFn(nearbySearch);
+  const navigate = useNavigate();
   const ranKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -32,11 +34,19 @@ export function usePlacesSearch() {
         });
         if (!cancelled) {
           setLocationReport(report);
+          
+          if (report.quotaExceeded) {
+            toast.error(
+              "Google Places API daily quota exhausted. Please try again tomorrow or increase the limit.",
+              { autoClose: 8000 }
+            );
+            navigate({ to: "/" });
+            return;
+          }
+
           const total = report.pois.reduce((n, g) => n + g.items.length, 0);
           if (total === 0) {
-            toast.error(
-              "No nearby places returned. The Google Places API daily quota may be exhausted — try again tomorrow or increase the quota.",
-            );
+            toast.error("No nearby places returned for the selected categories.");
           }
         }
       } catch (err) {

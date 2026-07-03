@@ -50,26 +50,32 @@ export function closestPointOnSegment(
 
 export async function fetchNearestHighways(lat: number, lng: number): Promise<HighwayInfo[]> {
   // Query Overpass for trunk/motorway roads with a ref tag within 25km
+  // Explicit filter for ways with a ref tag to fetch only National/State Highways
   const query = `
 [out:json][timeout:15];
-(
-  way["highway"~"^(motorway|trunk)$"]["ref"](around:25000,${lat},${lng});
-);
-out geom;
+way["highway"~"^(motorway|trunk)$"]["ref"](around:15000,${lat},${lng});
+out body geom;
 `;
   try {
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
+    const res = await fetch("https://lz4.overpass-api.de/api/interpreter", {
       method: "POST",
-      body: `data=${encodeURIComponent(query)}`,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `data=${encodeURIComponent(query.trim())}`,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json"
+      }
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error("Overpass API Error:", res.status, res.statusText, await res.text());
+      return [];
+    }
     const json = await res.json() as { elements: Array<{ tags?: { ref?: string; name?: string }; geometry?: Array<{ lat: number; lon: number }> }> };
 
     const highwaysMap = new Map<string, HighwayInfo>();
 
     for (const el of json.elements) {
-      if (!el.geometry || !el.tags?.ref) continue;
+      const refOrName = el.tags?.ref;
+      if (!el.geometry || !refOrName) continue;
 
       let minDist = Infinity;
       let bestPoint: { lat: number; lng: number } = { lat: el.geometry[0].lat, lng: el.geometry[0].lon };
@@ -89,12 +95,13 @@ out geom;
         }
       }
 
-      const ref = el.tags.ref;
+      const displayRef = el.tags?.ref || "Highway";
+      const displayName = el.tags?.name || displayRef;
 
-      if (!highwaysMap.has(ref) || minDist < highwaysMap.get(ref)!.distanceKm) {
-        highwaysMap.set(ref, {
-          ref,
-          name: el.tags.name ?? ref,
+      if (!highwaysMap.has(refOrName) || minDist < highwaysMap.get(refOrName)!.distanceKm) {
+        highwaysMap.set(refOrName, {
+          ref: displayRef,
+          name: displayName,
           distanceKm: +minDist.toFixed(1),
           closestPoint: bestPoint,
         });
@@ -104,7 +111,8 @@ out geom;
     return Array.from(highwaysMap.values())
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, 3);
-  } catch {
+  } catch (e) {
+    console.error("fetchNearestHighways exception:", e);
     return [];
   }
 }

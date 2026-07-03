@@ -79,9 +79,12 @@ export const fetchRoads = createServerFn({ method: "POST" })
 out geom;`;
 
     try {
-      const res = await fetch("https://overpass-api.de/api/interpreter", {
+      const res = await fetch("https://overpass.kumi.systems/api/interpreter", {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { 
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "LocalityInsightsApp/1.0"
+        },
         body: `data=${encodeURIComponent(query)}`,
       });
       if (!res.ok) {

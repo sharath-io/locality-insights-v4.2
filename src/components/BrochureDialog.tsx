@@ -64,7 +64,7 @@ export interface BrochureGeneratorProps {
   mapImageUrl?: string;
   highwayMapImageUrl?: string;
   sourceCoordinates?: { lat: number; lng: number };
-  highwayInfo?: { ref: string; name: string; distanceKm: number }[];
+  highwayInfo?: { ref: string; name: string; distanceKm: number; closestPoint?: { lat: number; lng: number } }[];
   highwayLoading?: boolean;
   nearbyPOIs?: BrochurePOI[];
   propertyDetails?: {
@@ -180,7 +180,7 @@ function MapImageSection({
   drivingDistances,
   templateId
 }: {
-  activeSection: "standard" | "highway" | "pip";
+  activeSection?: "standard" | "highway" | "pip" | null;
   mapImageUrl?: string;
   highwayMapImageUrl?: string;
   agentPhoto?: string;
@@ -199,14 +199,15 @@ function MapImageSection({
     // border, so we use values above 50% calibrated per template.
     if (templateId === "whatsapp")           pipObjectPosition = "70% center"; // confirmed ✓
     else if (templateId === "instagram-portrait") pipObjectPosition = "70% center"; // same geometry as whatsapp
-    else if (templateId === "instagram-square")   pipObjectPosition = "75% center"; // slightly squarer container
-    else if (templateId === "facebook")           pipObjectPosition = "60% center"; // wide container, less overflow
+    else if (templateId === "instagram-square")   pipObjectPosition = "100% center"; // Shift left to touch border
+    else if (templateId === "facebook")           pipObjectPosition = "100% center"; // Shift left to touch border
     else if (templateId === "a4")                 pipObjectPosition = "75% center"; // large page, good offset
-    else if (templateId === "captured-image")     pipObjectPosition = "62% center"; // near-native ratio, subtle shift
+    else if (templateId === "captured-image")     pipObjectPosition = "100% center"; // Shift left to touch border
   }
 
   const renderBadges = (isPipContext = false) => {
     if (!highwayInfo || highwayInfo.length === 0 || activeSection === "standard") return null;
+    if (activeSection === "highway" && (templateId === "instagram-square" || templateId === "instagram-portrait")) return null;
 
     if (activeSection === "pip") {
       return (
@@ -291,7 +292,7 @@ function MapImageSection({
               <img 
                 src={highwayMapImageUrl} 
                 crossOrigin={agentPhoto && agentPhoto.startsWith("data:") ? undefined : "anonymous"} 
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: "scale(1.2)" }} 
                 alt="Highway Map Inset" 
               />
             ) : (
@@ -858,7 +859,7 @@ export function BrochureDialog({
                         {/* Overlapping Title and Subtitle at Bottom */}
                         <div style={{
                           position: "absolute", bottom: 0, left: 0, right: 0,
-                          padding: "60px 24px 0",
+                          padding: activeSection === "highway" ? "60px 24px 24px" : "60px 24px 0",
                           background: "linear-gradient(to top, rgba(251,248,239,1) 0%, rgba(251,248,239,0.85) 40%, rgba(251,248,239,0) 100%)", // Fade to transparent
                           display: "flex", flexDirection: "column", alignItems: "flex-start",
                           pointerEvents: "none" // Prevents capturing clicks meant for the map if any
@@ -871,16 +872,43 @@ export function BrochureDialog({
                             {title}
                           </div>
                           
-                          {/* Location Pill */}
-                          <div style={{
-                            display: "inline-flex", alignItems: "center", gap: 10,
-                            background: "white", borderRadius: 20, padding: "10px 20px",
-                            border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-                            fontSize: 20, fontWeight: 700, color: textColor
-                          }}>
-                            <MapPin size={22} color={accentColor} />
-                            {subtitle}
-                          </div>
+                          {activeSection === "highway" ? (
+                            <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", pointerEvents: "auto" }}>
+                              {/* Location Pill */}
+                              <div style={{
+                                display: "inline-flex", alignItems: "center", gap: 10,
+                                background: "white", borderRadius: 20, padding: "10px 20px",
+                                border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                                fontSize: 20, fontWeight: 700, color: textColor
+                              }}>
+                                <MapPin size={22} color={accentColor} />
+                                {subtitle}
+                              </div>
+                              {/* Inline Highway Badges */}
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                {highwayInfo.map((hw) => {
+                                  const dist = drivingDistances?.[hw.ref] !== undefined ? drivingDistances[hw.ref] : hw.distanceKm;
+                                  return (
+                                    <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.95)", padding: "4px 12px 4px 4px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                                      <div style={{ background: "#1a56db", color: "white", fontSize: 12, fontWeight: 900, padding: "4px 10px", borderRadius: 99 }}>{hw.ref}</div>
+                                      <div style={{ color: "#1a1814", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{dist} km</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{
+                              display: "inline-flex", alignItems: "center", gap: 10,
+                              background: "white", borderRadius: 20, padding: "10px 20px",
+                              border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                              fontSize: 20, fontWeight: 700, color: textColor,
+                              pointerEvents: "auto"
+                            }}>
+                              <MapPin size={22} color={accentColor} />
+                              {subtitle}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1145,16 +1173,43 @@ export function BrochureDialog({
                               {title}
                             </div>
                             
-                            {/* Location Pill */}
+                          {activeSection === "highway" ? (
+                            <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", pointerEvents: "auto" }}>
+                              {/* Location Pill */}
+                              <div style={{
+                                display: "inline-flex", alignItems: "center", gap: 10,
+                                background: "white", borderRadius: 20, padding: "10px 20px",
+                                border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                                fontSize: 20, fontWeight: 700, color: textColor
+                              }}>
+                                <MapPin size={22} color={accentColor} />
+                                {subtitle}
+                              </div>
+                              {/* Inline Highway Badges */}
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                {highwayInfo.map((hw) => {
+                                  const dist = drivingDistances?.[hw.ref] !== undefined ? drivingDistances[hw.ref] : hw.distanceKm;
+                                  return (
+                                    <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.95)", padding: "4px 12px 4px 4px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                                      <div style={{ background: "#1a56db", color: "white", fontSize: 12, fontWeight: 900, padding: "4px 10px", borderRadius: 99 }}>{hw.ref}</div>
+                                      <div style={{ color: "#1a1814", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{dist} km</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
                             <div style={{
                               display: "inline-flex", alignItems: "center", gap: 10,
                               background: "white", borderRadius: 20, padding: "10px 20px",
                               border: "2px solid #ede8de", boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-                              fontSize: 20, fontWeight: 700, color: textColor
+                              fontSize: 20, fontWeight: 700, color: textColor,
+                              pointerEvents: "auto"
                             }}>
                               <MapPin size={22} color={accentColor} />
                               {subtitle}
                             </div>
+                          )}
                           </div>
                         </div>
 

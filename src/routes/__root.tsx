@@ -7,7 +7,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Toaster } from "sonner";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -114,7 +115,28 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster position="top-right" richColors />
+      <ToastContainer 
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        toastStyle={{
+          borderRadius: '12px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+          fontSize: '14.5px',
+          fontWeight: 600,
+          color: '#1a1814',
+          border: '1px solid #e8e3d8',
+          padding: '16px',
+          lineHeight: '1.5'
+        }}
+      />
     </QueryClientProvider>
   );
 }

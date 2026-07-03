@@ -51,63 +51,7 @@ export function MapboxHighwayImageDialog({
     mapRef.current = map;
 
     map.on("style.load", async () => {
-      // 1. Add site pin (Native WebGL layers instead of HTML markers for capture)
-      map.addSource("site-pin", {
-        type: "geojson",
-        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [lng, lat] } }
-      });
-      map.addLayer({
-        id: "site-pin-halo",
-        type: "circle",
-        source: "site-pin",
-        paint: { "circle-radius": 16, "circle-color": "#ffffff", "circle-opacity": 0.9 }
-      });
-      map.addLayer({
-        id: "site-pin-inner",
-        type: "circle",
-        source: "site-pin",
-        paint: { "circle-radius": 12, "circle-color": "#e53935" }
-      });
-
-      // 2. Add Highway Markers (Native WebGL layers)
-      highwayInfo.forEach((hw, i) => {
-        map.addSource(`hw-marker-${i}`, {
-          type: "geojson",
-          data: { type: "Feature", properties: { ref: hw.ref }, geometry: { type: "Point", coordinates: [hw.closestPoint.lng, hw.closestPoint.lat] } }
-        });
-        map.addLayer({
-          id: `hw-halo-${i}`,
-          type: "circle",
-          source: `hw-marker-${i}`,
-          paint: { "circle-radius": 16, "circle-color": "#ffffff", "circle-opacity": 0.9 }
-        });
-        map.addLayer({
-          id: `hw-inner-${i}`,
-          type: "circle",
-          source: `hw-marker-${i}`,
-          paint: { "circle-radius": 12, "circle-color": "#1a56db" }
-        });
-        map.addLayer({
-          id: `hw-text-${i}`,
-          type: "symbol",
-          source: `hw-marker-${i}`,
-          layout: {
-            "text-field": "{ref}",
-            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-size": 22,
-            "text-anchor": "left",
-            "text-offset": [1.2, 0],
-            "text-allow-overlap": true,
-          },
-          paint: { 
-            "text-color": "#1a56db",
-            "text-halo-color": "#ffffff",
-            "text-halo-width": 3
-          }
-        });
-      });
-
-      // 3. Initialize Bounds with endpoints
+      // 1. Initialize Bounds with endpoints
       const bounds = new mapboxgl.LngLatBounds([lng, lat], [lng, lat]);
       if (highwayInfo.length > 0) {
         highwayInfo.forEach((hw) => bounds.extend([hw.closestPoint.lng, hw.closestPoint.lat]));
@@ -156,9 +100,67 @@ export function MapboxHighwayImageDialog({
         );
         
         // Fit map exactly to the new bounds that include routes
-        // Padding increased significantly to 280 to ensure the path is fully visible and zoomed out in the PIP lens
-        map.fitBounds(bounds, { padding: 280, maxZoom: 13.5, duration: 0 });
+        // Padding increased to 240 to ensure highway labels and site pin aren't clipped
+        map.fitBounds(bounds, { padding: 240, maxZoom: 14, duration: 0 });
       }
+
+      // 3. Add site pin (Native WebGL layers instead of HTML markers for capture)
+      // Added AFTER routes so the pin sits on top of the route line
+      map.addSource("site-pin", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [lng, lat] } }
+      });
+      map.addLayer({
+        id: "site-pin-halo",
+        type: "circle",
+        source: "site-pin",
+        paint: { "circle-radius": 16, "circle-color": "#ffffff", "circle-opacity": 0.9 }
+      });
+      map.addLayer({
+        id: "site-pin-inner",
+        type: "circle",
+        source: "site-pin",
+        paint: { "circle-radius": 12, "circle-color": "#e53935" }
+      });
+
+      // 4. Add Highway Markers (Native WebGL layers)
+      // Added AFTER routes so the marker and text label sit on top of the route line
+      highwayInfo.forEach((hw, i) => {
+        map.addSource(`hw-marker-${i}`, {
+          type: "geojson",
+          data: { type: "Feature", properties: { ref: hw.ref }, geometry: { type: "Point", coordinates: [hw.closestPoint.lng, hw.closestPoint.lat] } }
+        });
+        map.addLayer({
+          id: `hw-halo-${i}`,
+          type: "circle",
+          source: `hw-marker-${i}`,
+          paint: { "circle-radius": 16, "circle-color": "#ffffff", "circle-opacity": 0.9 }
+        });
+        map.addLayer({
+          id: `hw-inner-${i}`,
+          type: "circle",
+          source: `hw-marker-${i}`,
+          paint: { "circle-radius": 12, "circle-color": "#1a56db" }
+        });
+        map.addLayer({
+          id: `hw-text-${i}`,
+          type: "symbol",
+          source: `hw-marker-${i}`,
+          layout: {
+            "text-field": "{ref}",
+            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-size": 22,
+            "text-anchor": "left",
+            "text-offset": [1.5, 0],
+            "text-allow-overlap": false,
+          },
+          paint: { 
+            "text-color": "#1a56db",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 3
+          }
+        });
+      });
 
       // Wait for all newly added sources/layers to actually render before capturing
       map.once("idle", () => {
