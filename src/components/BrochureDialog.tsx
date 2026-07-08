@@ -229,16 +229,18 @@ function MapImageSection({
       );
     }
 
+    const isMapImage = templateId === "captured-image";
+
     return (
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "60px 24px 24px", background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-start", zIndex: 30, pointerEvents: "none" }}>
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: isMapImage ? "120px 48px 48px" : "60px 24px 24px", background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", display: "flex", flexWrap: "wrap", gap: isMapImage ? 16 : 8, justifyContent: "flex-start", zIndex: 30, pointerEvents: "none" }}>
         {highwayInfo.map((hw) => {
           const dist = drivingDistances?.[hw.ref] !== undefined ? drivingDistances[hw.ref] : hw.distanceKm;
           return (
-            <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.95)", padding: "4px 12px 4px 4px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
-              <div style={{ background: "#1a56db", color: "white", fontSize: 12, fontWeight: 900, padding: "4px 10px", borderRadius: 99 }}>
+            <div key={hw.ref} style={{ display: "flex", alignItems: "center", gap: isMapImage ? 16 : 8, background: "rgba(255,255,255,0.95)", padding: isMapImage ? "8px 24px 8px 8px" : "4px 12px 4px 4px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+              <div style={{ background: "#1a56db", color: "white", fontSize: isMapImage ? 24 : 12, fontWeight: 900, padding: isMapImage ? "8px 20px" : "4px 10px", borderRadius: 99 }}>
                 {hw.ref}
               </div>
-              <div style={{ color: "#1a1814", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>
+              <div style={{ color: "#1a1814", fontSize: isMapImage ? 24 : 12, fontWeight: 800, whiteSpace: "nowrap" }}>
                 {dist} km
               </div>
             </div>

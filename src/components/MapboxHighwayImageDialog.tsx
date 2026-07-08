@@ -100,8 +100,8 @@ export function MapboxHighwayImageDialog({
         );
         
         // Fit map exactly to the new bounds that include routes
-        // Padding increased to 240 to ensure highway labels and site pin aren't clipped
-        map.fitBounds(bounds, { padding: 240, maxZoom: 14, duration: 0 });
+        // Padding increased to 350 to ensure highway labels and site pin aren't clipped by BrochureDialog
+        map.fitBounds(bounds, { padding: 350, maxZoom: 14, duration: 0 });
       }
 
       // 3. Add site pin (Native WebGL layers instead of HTML markers for capture)
@@ -162,10 +162,17 @@ export function MapboxHighwayImageDialog({
         });
       });
 
-      // Wait for all newly added sources/layers to actually render before capturing
-      map.once("idle", () => {
-        setImgLoaded(true);
-      });
+      // Give the map a moment to queue new tile requests after fitBounds before waiting for idle
+      setTimeout(() => {
+        if (!mapRef.current) return;
+        if (mapRef.current.loaded()) {
+          setImgLoaded(true);
+        } else {
+          mapRef.current.once("idle", () => {
+            setImgLoaded(true);
+          });
+        }
+      }, 400);
     });
 
     return () => {
@@ -176,19 +183,23 @@ export function MapboxHighwayImageDialog({
 
   useEffect(() => {
     if (imgLoaded && open && !capturedRef.current) {
-      // Now that map is idle, capture it immediately
+      capturedRef.current = true;
+      // Now that map is idle, capture it in the next render cycle to guarantee a fresh WebGL buffer
       setTimeout(() => {
         if (!mapRef.current) return;
-        try {
-          const dataUrl = mapRef.current.getCanvas().toDataURL("image/png");
-          onGenerateHighwayMap(dataUrl);
-        } catch (e) {
-          console.error("Highway map capture failed:", e);
-          onGenerateHighwayMap("");
-        } finally {
-          setIsCapturing(false);
-        }
-      }, 500); // 500ms buffer just to be absolutely sure WebGL flushed
+        mapRef.current.once("render", () => {
+          try {
+            const dataUrl = mapRef.current!.getCanvas().toDataURL("image/png");
+            onGenerateHighwayMap(dataUrl);
+          } catch (e) {
+            console.error("Highway map capture failed:", e);
+            onGenerateHighwayMap("");
+          } finally {
+            setIsCapturing(false);
+          }
+        });
+        mapRef.current.triggerRepaint();
+      }, 100);
     }
   }, [imgLoaded, open, onGenerateHighwayMap]);
 

@@ -167,11 +167,13 @@ function AnalysisPage() {
     // After the main map is captured, trigger the highway map capture
     if (autoBrochureMode) {
       setAutoBrochureStep(4); // "Mapping highways..."
-      if (highwayLoading) {
-        setWaitingForHighways(true);
-        return;
-      }
     }
+    
+    if (highwayLoading) {
+      setWaitingForHighways(true);
+      return;
+    }
+    
     setIsHighwayImageOpen(true);
   };
 

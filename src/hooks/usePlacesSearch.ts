@@ -46,7 +46,9 @@ export function usePlacesSearch() {
 
           const total = report.pois.reduce((n, g) => n + g.items.length, 0);
           if (total === 0) {
-            toast.error("No nearby places returned for the selected categories.");
+            toast.warn("No nearby places found for the selected categories in this location.");
+            navigate({ to: "/" });
+            return;
           }
         }
       } catch (err) {

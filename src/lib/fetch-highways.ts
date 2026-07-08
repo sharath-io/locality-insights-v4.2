@@ -49,17 +49,27 @@ export function closestPointOnSegment(
 }
 
 export async function fetchNearestHighways(lat: number, lng: number): Promise<HighwayInfo[]> {
-  // Query Overpass for trunk/motorway roads with a ref tag within 25km
-  // Explicit filter for ways with a ref tag to fetch only National/State Highways
+  // 1 degree of latitude is ~111.32 km
+  // Calculate bounding box for a 25km square radius to optimize Overpass DB performance
+  const latDelta = 25 / 111.32;
+  const lngDelta = 25 / (111.32 * Math.cos((lat * Math.PI) / 180));
+
+  const minLat = (lat - latDelta).toFixed(5);
+  const maxLat = (lat + latDelta).toFixed(5);
+  const minLng = (lng - lngDelta).toFixed(5);
+  const maxLng = (lng + lngDelta).toFixed(5);
+
+  // Use [bbox:south,west,north,east] instead of (around:...)
+  // This uses spatial indexes and is significantly faster, allowing a 10s timeout
   const query = `
-[out:json][timeout:15];
-way["highway"~"^(motorway|trunk)$"]["ref"](around:15000,${lat},${lng});
+[out:json][timeout:10][bbox:${minLat},${minLng},${maxLat},${maxLng}];
+way["highway"~"^(motorway|trunk)$"]["ref"];
 out body geom;
 `;
   const endpoints = [
     "https://lz4.overpass-api.de/api/interpreter",
-    "https://overpass-api.de/api/interpreter",
     "https://z.overpass-api.de/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
   ];
 
   let json: any = null;
@@ -76,13 +86,20 @@ out body geom;
       });
       
       if (res.ok) {
-        json = await res.json();
-        break; // Successfully fetched, exit loop
+        const data = await res.json();
+        // Overpass often returns 200 OK but embeds runtime errors in the 'remark' field.
+        if (data.remark) {
+          console.warn(`Overpass API embedded error on ${endpoint}:`, data.remark);
+          // Server returned an error (e.g. timeout), so we DO NOT break. We try the next endpoint!
+        } else if (data.elements) {
+          json = data;
+          break; // Successfully fetched without errors, exit loop
+        }
       } else {
         console.warn(`Overpass API failed on ${endpoint}:`, res.status, res.statusText);
       }
     } catch (e) {
-      console.warn(`Overpass API error on ${endpoint}:`, e);
+      console.warn(`Overpass API fetch error on ${endpoint}:`, e);
     }
   }
 

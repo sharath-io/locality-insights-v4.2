@@ -112,6 +112,14 @@ export default function LandingPage() {
   const canGenerate = !!parsedCoords && selected.length > 0;
 
   const handleGenerate = () => {
+    if (!parsedCoords) {
+      alert("Please provide a valid Google Maps link with coordinates.");
+      return;
+    }
+    if (selected.length === 0) {
+      alert("Please select at least one Intelligence Layer (category) from the right panel.");
+      return;
+    }
     const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
     // Wipe any stale analysis state before starting a fresh report
     resetAnalysis();
@@ -123,6 +131,14 @@ export default function LandingPage() {
   };
 
   const handleGenerateBrochureDirectly = () => {
+    if (!parsedCoords) {
+      alert("Please provide a valid Google Maps link with coordinates.");
+      return;
+    }
+    if (selected.length === 0) {
+      alert("Please select at least one Intelligence Layer (category) from the right panel.");
+      return;
+    }
     const labels = CATEGORIES.filter((c) => selected.includes(c.id)).map((c) => c.label);
     resetAnalysis();
     setIsGenerating(true);
@@ -171,9 +187,11 @@ export default function LandingPage() {
 
             <button
               onClick={handleGenerate}
-              disabled={!canGenerate || isGenerating}
-              className="mt-5 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ backgroundColor: canGenerate && !isGenerating ? "#6b7c5e" : "#4a5540" }}
+              disabled={isGenerating}
+              className={`mt-5 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-all ${
+                canGenerate && !isGenerating ? "cursor-pointer" : "cursor-not-allowed"
+              } disabled:opacity-60 disabled:cursor-wait`}
+              style={{ backgroundColor: canGenerate && !isGenerating ? "#6b7c5e" : "#5a6a4f" }}
               onMouseEnter={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.backgroundColor = "#5a6a4f"; }}
               onMouseLeave={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.backgroundColor = "#6b7c5e"; }}
             >
@@ -182,13 +200,15 @@ export default function LandingPage() {
 
             <button
               onClick={handleGenerateBrochureDirectly}
-              disabled={!canGenerate || isGenerating}
-              className="mt-3 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={isGenerating}
+              className={`mt-3 w-full rounded-lg py-4 text-white text-sm font-medium tracking-wide transition-all ${
+                canGenerate && !isGenerating ? "cursor-pointer" : "cursor-not-allowed"
+              } disabled:opacity-60 disabled:cursor-wait flex items-center justify-center gap-2`}
               style={{
                 background: canGenerate && !isGenerating
                   ? "linear-gradient(135deg, #c8b97e 0%, #a8975e 100%)"
-                  : "rgba(200,185,126,0.25)",
-                color: canGenerate && !isGenerating ? "#0c1018" : "rgba(200,185,126,0.5)",
+                  : "rgba(200,185,126,0.35)",
+                color: canGenerate && !isGenerating ? "#0c1018" : "rgba(200,185,126,0.9)",
               }}
               onMouseEnter={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.opacity = "0.88"; }}
               onMouseLeave={(e) => { if (canGenerate && !isGenerating) e.currentTarget.style.opacity = "1"; }}
@@ -206,7 +226,10 @@ export default function LandingPage() {
               {QUICK_LOCATIONS.map((loc) => (
                 <button
                   key={loc.name}
-                  onClick={() => setInputUrl(loc.url)}
+                  onClick={() => {
+                    setInputUrl(loc.url);
+                    if (selected.length === 0) setSelected(REALESTATE_IDS);
+                  }}
                   className="text-xs tracking-wide px-3.5 py-2 bg-white/5 border border-white/10 rounded-md text-white/80 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all cursor-pointer font-medium"
                 >
                   {loc.name}

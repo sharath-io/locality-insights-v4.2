@@ -74,13 +74,15 @@ async function getFormattedAddress(lat: number, lng: number): Promise<string> {
 export const nearbySearch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data }): Promise<LocationReport> => {
-    const apiKey = process.env.GOOGLE_PLACES_KEY;
+    const rawKeys = process.env.GOOGLE_PLACES_KEY || "";
+    const cleanedKeysString = rawKeys.replace(/["“”'‘’]/g, '');
+    const apiKeys = cleanedKeysString.split(',').map(k => k.trim()).filter(Boolean);
     const { lat, lng, categories, radiusMeters } = data;
     console.log("SERVER: nearbySearch handler called.");
     console.log("SERVER: Coordinates:", lat, lng);
     console.log("SERVER: Categories:", categories);
-    console.log("SERVER: API Key defined:", !!apiKey);
-    if (!apiKey) throw new Error("GOOGLE_PLACES_KEY not configured");
+    console.log("SERVER: Total API Keys loaded:", apiKeys.length);
+    if (apiKeys.length === 0) throw new Error("GOOGLE_PLACES_KEY not configured");
 
     const groups = await Promise.all(
       categories.map(async (cat) => {
@@ -93,28 +95,45 @@ export const nearbySearch = createServerFn({ method: "POST" })
           // reduce total API call count).
           const includedTypes = Array.isArray(mappedType) ? mappedType : [mappedType];
 
-          const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Goog-Api-Key": apiKey,
-              "X-Goog-FieldMask": "places.displayName,places.location,places.rating,places.userRatingCount,places.types",
-            },
-            body: JSON.stringify({
-              locationRestriction: {
-                circle: {
-                  center: { latitude: lat, longitude: lng },
-                  radius: radiusMeters,
-                },
+          // Shuffle API keys to distribute load, and provide fallback if one fails or is rate-limited
+          const shuffledKeys = [...apiKeys].sort(() => Math.random() - 0.5);
+          
+          let res: Response | null = null;
+          let lastStatus = 0;
+          let lastText = "";
+          
+          for (const apiKey of shuffledKeys) {
+            res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": apiKey,
+                "X-Goog-FieldMask": "places.displayName,places.location,places.rating,places.userRatingCount,places.types",
               },
-              includedTypes,
-              maxResultCount: 10,
-            }),
-          });
+              body: JSON.stringify({
+                locationRestriction: {
+                  circle: {
+                    center: { latitude: lat, longitude: lng },
+                    radius: radiusMeters,
+                  },
+                },
+                includedTypes,
+                maxResultCount: 10,
+              }),
+            });
 
-          if (!res.ok) {
-            const is429 = res.status === 429;
-            console.error(`Places API error for ${cat}:`, res.status, await res.text());
+            if (res.ok) {
+              break; // Success!
+            }
+            
+            lastStatus = res.status;
+            lastText = await res.text();
+            console.warn(`Places API error for ${cat} with a key: ${lastStatus}`);
+          }
+
+          if (!res || !res.ok) {
+            const is429 = lastStatus === 429;
+            console.error(`Places API error for ${cat} after all retries:`, lastStatus, lastText);
             return { type: cat, items: [], is429 };
           }
 
