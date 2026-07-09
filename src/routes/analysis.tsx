@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Camera, List, CircleDot, Minus, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Camera, List, CircleDot, Minus, Navigation, Pin } from "lucide-react";
 import type { BrochurePOI } from "@/components/BrochureDialog";
 import { useReportStore } from "@/stores/reportStore";
 import { usePlacesSearch } from "@/hooks/usePlacesSearch";
@@ -382,7 +382,73 @@ function AnalysisPage() {
 
         {/* Bottom controls below map */}
         <div className="mt-3 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex flex-wrap items-center gap-3" />
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Pin the Locations — auto-pins top 2 important POIs per category */}
+            {!isGenerating && groupedPois.length > 0 && (
+              <button
+                id="pin-locations-btn"
+                onClick={() => {
+                  // Clear existing pins first
+                  clearAllPois();
+                  // Auto-select top 2 POIs per category (best score + nearest)
+                  groupedPois.forEach(({ type, items }) => {
+                    if (items.length === 0) return;
+
+                    const sortedByScore = [...items].sort((a, b) => {
+                      const distA = Math.max(0.1, a.distanceKm);
+                      const distB = Math.max(0.1, b.distanceKm);
+                      const scoreA = ((a.rating || 0) * (a.userRatingCount || 0)) / distA;
+                      const scoreB = ((b.rating || 0) * (b.userRatingCount || 0)) / distB;
+                      const diff = scoreB - scoreA;
+                      if (diff !== 0) return diff;
+                      return a.distanceKm - b.distanceKm;
+                    });
+
+                    // 1st pick: best by popularity score
+                    const best = sortedByScore[0];
+                    togglePoi({
+                      id: best.id,
+                      name: best.name,
+                      type: best.type,
+                      lat: best.lat,
+                      lng: best.lng,
+                      distanceKm: best.distanceKm,
+                      types: best.types,
+                    });
+
+                    if (sortedByScore.length > 1) {
+                      // 2nd pick: nearest from the remaining items
+                      const remaining = sortedByScore.slice(1);
+                      const nearest = [...remaining].sort((a, b) => a.distanceKm - b.distanceKm)[0];
+                      // Only add if it's a genuinely different POI
+                      if (nearest.id !== best.id) {
+                        togglePoi({
+                          id: nearest.id,
+                          name: nearest.name,
+                          type: nearest.type,
+                          lat: nearest.lat,
+                          lng: nearest.lng,
+                          distanceKm: nearest.distanceKm,
+                          types: nearest.types,
+                        });
+                      }
+                    }
+                  });
+                }}
+                className="flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-[12px] sm:text-[14px] font-bold transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-md hover:shadow-xl border cursor-pointer"
+                style={{
+                  background: "linear-gradient(135deg, var(--navy) 0%, #2a3441 100%)",
+                  borderColor: "rgba(255,255,255,0.1)",
+                  color: "white",
+                  letterSpacing: "0.01em",
+                }}
+                title="Auto-pin the most important locations (nearest & most popular) per category"
+              >
+                <Pin className="w-4 h-4 text-[var(--gold)]" />
+                Pin the Locations
+              </button>
+            )}
+          </div>
 
           {/* Style selection + Brochure CTA on right */}
           <div className="flex flex-wrap items-center justify-end gap-2">
